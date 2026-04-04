@@ -116,6 +116,15 @@ Restart Claude Code for changes to take effect.
 
 </details>
 
+## Updating plugins
+
+The `/plugin` menu has two update paths, and they behave differently:
+
+- `/plugin` → **Marketplaces** → **Update marketplace** — pulls the latest plugin catalog from the repo immediately. This is the reliable way to get updates.
+- `/plugin` → **Installed** → **Update now** — uses a local cache that can be stale for a long time and may not reflect recent changes. Use this as a fallback after updating the marketplace.
+
+To keep plugins current automatically, enable `/plugin` → **Marketplaces** → **Enable auto-update**. This updates the marketplace catalog on each session start.
+
 ## Plugins
 
 | Plugin | Description |
