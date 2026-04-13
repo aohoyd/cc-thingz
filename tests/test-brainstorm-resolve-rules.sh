@@ -172,7 +172,7 @@ rm -rf "$WORK_DIR/.claude"
 output="$( (cd "$WORK_DIR" && CLAUDE_PLUGIN_DATA="$USER_DIR" bash "$RESOLVE_SCRIPT" "$TEST_FILENAME" "$ALT_DIR") )"
 assert_output "argument overrides env var" "from argument" "$output"
 
-rm -rf "$ALT_DIR" "$USER_DIR/$TEST_FILENAME"
+rm -rf "$ALT_DIR" "${USER_DIR:?}/$TEST_FILENAME"
 
 # summary
 echo ""
