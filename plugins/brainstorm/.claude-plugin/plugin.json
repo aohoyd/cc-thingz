@@ -1,11 +1,11 @@
 {
-  "name": "brainstorm",
-  "description": "Collaborative design dialogue - idea to approaches to design to plan",
-  "version": "3.0.0",
-  "author": {
-    "name": "aohoyd"
-  },
-  "homepage": "https://github.com/aohoyd/cc-utils",
-  "repository": "https://github.com/aohoyd/cc-utils",
-  "license": "MIT"
+	"name": "brainstorm",
+	"description": "Collaborative design dialogue - idea to approaches to design to plan",
+	"version": "4.0.0",
+	"author": {
+		"name": "aohoyd"
+	},
+	"homepage": "https://github.com/aohoyd/cc-utils",
+	"repository": "https://github.com/aohoyd/cc-utils",
+	"license": "MIT"
 }

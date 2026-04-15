@@ -1,18 +1,24 @@
 ---
 name: ask-codex
-description: Consult OpenAI Codex (GPT-5) for investigation, debugging, or code review. This skill should be used when user explicitly asks to "ask codex", "check with codex", "codex review", "get codex opinion", or "consult codex".
+description: Consult OpenAI Codex for investigation, debugging, or code review. Use when user explicitly asks to "ask codex", "check with codex", "codex review", or as a last resort when stuck after 4+ failed attempts at debugging, investigation, or bug fix and completely out of ideas. Codex is slow (2-5 min), so only escalate when truly stuck. Codex runs in read-only mode with full project access — it analyzes, we implement.
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # Ask Codex
 
-Consult OpenAI Codex (GPT-5) as a second opinion for investigation, debugging, or review tasks. Codex runs in read-only mode with full project access — it analyzes, Claude implements.
+Consult OpenAI Codex (GPT-5) as a second opinion for investigation, debugging, or review tasks.
 
 ## Activation Triggers
 
+**Explicit:**
 - "ask codex", "check with codex", "codex review"
 - "what does codex think", "get codex opinion"
 - "consult codex", "run codex on this"
+
+**Automatic (last resort — stuck detection):**
+- 4+ failed attempts at the same bug fix or investigation
+- completely out of ideas, all reasonable approaches exhausted
+- going in circles with no progress despite multiple different strategies
 
 ## Workflow
 
@@ -29,14 +35,16 @@ Gather context from the current conversation:
 3. **What we tried** — approaches attempted and why they failed (if applicable)
 4. **Specific question** — what exactly codex should analyze or answer
 
+If CLAUDE.md exists in the project, it will be passed as project context.
+
 ### Step 3: Construct Prompt
 
 Build a focused prompt. Do NOT dump entire files — codex has full project access and can read them itself. Provide file paths and line references so codex knows where to look.
 
-**Template:**
+**Template for investigation/debug:**
 
 ```
-# [Investigation/Debug/Review] Request
+# [Investigation/Debug] Request
 
 ## Problem
 [2-3 sentence description]
@@ -60,15 +68,98 @@ Provide:
 Keep response focused and actionable.
 ```
 
+**Template for code review (adversarial):**
+
+When asked for a code review, use this adversarial prompt that requires structured JSON output:
+
+```
+<role>
+You are performing an adversarial code review.
+Your job is to break confidence in the change, not to validate it.
+</role>
+
+<task>
+Review the provided changes as if you are trying to find the strongest reasons
+this change should not ship yet.
+Scope: [files and changes to review — paths, branch diff, or description]
+Focus: [specific area if user specified one, otherwise "general"]
+</task>
+
+<operating_stance>
+Default to skepticism.
+Assume the change can fail in subtle, high-cost, or user-visible ways until
+the evidence says otherwise. Do not give credit for good intent or partial fixes.
+If something only works on the happy path, treat that as a real weakness.
+</operating_stance>
+
+<attack_surfaces>
+Prioritize failures that are expensive, dangerous, or hard to detect:
+- auth, permissions, tenant isolation, and trust boundaries
+- data loss, corruption, duplication, and irreversible state changes
+- rollback safety, retries, partial failure, and idempotency gaps
+- race conditions, ordering assumptions, stale state, and re-entrancy
+- empty-state, nil, timeout, and degraded dependency behavior
+- version skew, schema drift, migration hazards, and compatibility regressions
+- observability gaps that would hide failure or make recovery harder
+</attack_surfaces>
+
+<finding_bar>
+Report only material findings. No style feedback, naming nitpicks, or speculative
+concerns without evidence. Each finding must answer:
+1. What can go wrong?
+2. Why is this code path vulnerable?
+3. What is the likely impact?
+4. What concrete change would reduce the risk?
+Prefer one strong finding over several weak ones.
+</finding_bar>
+
+<grounding_rules>
+Every finding must be defensible from actual code you can see.
+Do not invent files, lines, code paths, or runtime behavior you cannot support.
+If a conclusion depends on an inference, state that explicitly and keep the
+confidence score honest.
+</grounding_rules>
+
+<structured_output>
+Return ONLY valid JSON. Example with concrete values:
+{
+  "verdict": "needs-attention",
+  "summary": "auth middleware skips token validation on retry paths",
+  "findings": [
+    {
+      "severity": "high",
+      "title": "token validation bypassed on retry",
+      "body": "retryHandler re-enters serveHTTP without revalidating the bearer token, allowing expired tokens through on transient failures",
+      "file": "internal/auth/middleware.go",
+      "line_start": 42,
+      "line_end": 55,
+      "confidence": 0.85,
+      "recommendation": "move token validation before the retry loop entry point"
+    }
+  ],
+  "next_steps": ["add test for expired-token retry scenario"]
+}
+
+Allowed values:
+- verdict: "approve" or "needs-attention"
+- severity: "critical", "high", "medium", or "low"
+- confidence: 0.0 to 1.0
+
+Use "needs-attention" if there is any material risk worth blocking on.
+Use "approve" only if you cannot support any substantive finding.
+</structured_output>
+```
+
 ### Step 4: Execute Codex
 
 Run codex in background (it takes 2-5 minutes for complex analysis):
 
 ```bash
-codex exec -m gpt-5 \
+codex exec -m gpt-5.4 \
   --sandbox read-only \
   -c model_reasoning_effort="high" \
   -c stream_idle_timeout_ms=600000 \
+  -c project_doc="$HOME/.claude/CLAUDE.md" \
   -c project_doc="./CLAUDE.md" \
   "prompt here"
 ```
@@ -81,18 +172,18 @@ codex exec -m gpt-5 \
 
 **Flags:**
 - `--sandbox read-only` — codex can read all project files but cannot modify anything
-- `-m gpt-5` — codex model (adjust to latest available)
+- `-m gpt-5.4` — latest model (adjust as newer versions become available)
 - `model_reasoning_effort="high"` — maximum reasoning depth
-- `project_doc` — passes CLAUDE.md as project context
+- `project_doc` — passes CLAUDE.md as project context (both global and local if present)
 
 ### Step 5: Present Results
 
 1. **Extract codex's analysis** — skip session info, token counts, prompt echo
-2. **Present findings** clearly formatted
-3. **Add assessment** — agree, disagree, or note caveats
-4. **Propose next steps** — ask if user wants to implement the suggestion
+2. **Parse structured output** — for reviews, codex returns JSON; parse and present as structured findings
+3. **Add your assessment** — agree, disagree, or note caveats
+4. **STOP and ask** — do NOT apply any fixes or changes without explicit user approval
 
-**Output format:**
+**For investigation/debug responses** (unstructured):
 
 ```
 **Codex Analysis:**
@@ -101,16 +192,60 @@ codex exec -m gpt-5 \
 
 ---
 
-**Assessment:** [2-3 sentence evaluation of codex's findings]
+**Assessment:** [Your 2-3 sentence evaluation]
 
-**Next steps:** [What to do with this information]
+**Proposed action:** [What codex suggests — awaiting approval]
 ```
+
+**For review responses** (structured JSON):
+
+Parse the JSON output and present findings sorted by severity, filtered by confidence:
+
+```
+**Codex Review: [verdict]**
+[summary]
+
+**Findings** (N issues):
+
+1. **[critical]** title (confidence: 0.9)
+   file.go:42-55
+   [body]
+   → [recommendation]
+
+2. **[high]** title (confidence: 0.8)
+   ...
+
+**Next steps:** [list]
+
+---
+
+**Assessment:** [Your evaluation — which findings are valid, which are false positives]
+```
+
+- skip findings with confidence < 0.3 (likely noise)
+- group by severity: critical → high → medium → low
+- if verdict is "approve" and no findings, just say "codex found no material issues"
+
+**CRITICAL: After presenting findings, STOP. Do not apply fixes, do not touch files, do not start implementing suggestions. Explicitly ask the user what to do next. Codex findings are input for discussion, not automatic work orders.**
 
 ## Important Rules
 
-- **Read-only always** — codex analyzes, Claude implements. Never let codex edit files.
+- **Read-only always** — codex analyzes, we implement. Never let codex edit files.
 - **Don't duplicate files** — codex has full project access. Provide paths, not content.
 - **Focused prompts** — specific questions get better answers than broad "review everything".
 - **Background execution** — always run in background to avoid timeout issues.
 - **One question at a time** — if multiple concerns, run separate codex queries.
 - **Critical thinking** — codex can be wrong. Evaluate its suggestions before implementing.
+
+## When NOT to Use
+
+- Simple questions you already know the answer to
+- Tasks where the solution is clear and just needs implementation
+- File searches or codebase navigation (use Grep/Glob instead)
+
+## Troubleshooting
+
+- **Codex not found**: `which codex` — install via `npm install -g @openai/codex`
+- **Authentication**: `codex login` if getting auth errors
+- **Timeout**: increase `stream_idle_timeout_ms` for complex analyses
+- **Off-target response**: refine prompt with more specific file:line references

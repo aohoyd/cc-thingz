@@ -124,12 +124,16 @@ AskUserQuestion with options: "Write plan" / "Plan mode" / "Start now"
 
 ## Key Principles
 
-- One question at a time via AskUserQuestion tool — NEVER plain text
-- Context first — explore before asking, so questions are informed
-- Intent before implementation — scope/goals first, edge cases last
-- YAGNI ruthlessly — remove unnecessary features from designs
-- Lead with recommendation — have an opinion, let user decide
-- Incremental validation — section by section, validate each
+- **One question at a time via AskUserQuestion tool** - do not overwhelm with multiple questions and NEVER PLAIN TEXT
+- **Context first** - explore before asking, so questions are informed
+- **Intent before implementation** - scope/goals first, edge cases last
+- **Multiple choice preferred** - easier to answer than open-ended when possible
+- **YAGNI ruthlessly** - remove unnecessary features from all designs, keep scope minimal
+- **Explore alternatives** - always propose 2-3 approaches before settling
+- **Incremental validation** - present design in sections, validate each
+- **Be flexible** - go back and clarify when something doesn't make sense
+- **Lead with recommendation** - have an opinion, explain why, but let user decide
+- **Duplication vs abstraction** - when code repeats, ask user: prefer duplication (simpler, no coupling) or abstraction (DRY but adds complexity)? explain trade-offs before deciding
 
 <SELF-CHECK>
 Before EVERY response, verify:

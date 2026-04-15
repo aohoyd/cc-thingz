@@ -1,7 +1,7 @@
 ---
 description: Create structured implementation plan in docs/plans/
 argument-hint: describe the feature or task to plan
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Task, EnterPlanMode, TaskCreate, TaskUpdate, TaskList, Skill
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Task, EnterPlanMode, TaskCreate, TaskUpdate, TaskList, Skill
 ---
 
 # Implementation Plan Creation
@@ -19,33 +19,34 @@ before asking questions, understand what the user is working on:
    - "migrate to Z" / "upgrade W" → migration plan
    - generic request → explore current work
 
-2. **launch Explore agent** to gather relevant context based on intent:
+2. **gather relevant context quickly** — use direct tool calls (Read, Glob, Grep), NOT an Explore agent. keep discovery under 30 seconds:
 
    **for feature development:**
-   - locate related existing code and patterns
-   - check project structure and similar implementations
-   - identify affected components and dependencies
+   - glob for files matching the feature area (e.g., `**/*auth*`, `**/*cache*`)
+   - read 1-3 most relevant files to understand existing patterns
+   - check project structure with a quick `ls` of key directories
 
    **for bug fixing:**
-   - look for error logs, test failures, or stack traces
-   - find related code that might be involved
-   - check recent changes in problem areas
+   - grep for error messages or function names mentioned in the request
+   - read the specific file(s) involved
+   - check `git log --oneline -5` for recent changes
 
    **for refactoring/migration:**
-   - identify all files/components affected
-   - check test coverage of affected areas
-   - find dependencies and integration points
+   - glob for files matching the area being refactored
+   - read 2-3 key files to understand current structure
+   - grep for imports/references to identify dependencies
 
    **for generic/unclear requests:**
-   - check `git status` and recent file activity
-   - examine current working directory structure
-   - identify primary language/framework
+   - check `git status` and `git log --oneline -5`
+   - read README.md or CLAUDE.md for project overview
+   - `ls` the top-level directory structure
 
-3. **synthesize findings** into context summary:
-   - what work is in progress
-   - which files/areas are involved
-   - what the apparent goal is
-   - relevant patterns or structure discovered
+   **CRITICAL: do NOT launch an Explore agent or read more than 5 files in this step. the goal is a quick scan, not exhaustive analysis. if more context is needed, ask the user in step 1.**
+
+3. **synthesize findings** into a brief context summary (3-5 bullet points):
+   - what the project is and primary language/framework
+   - which files/areas are relevant to the request
+   - key patterns or conventions observed
 
 ## step 1: present context and ask focused questions
 
@@ -168,6 +169,16 @@ check `docs/plans/` for existing files, then create `docs/plans/yyyymmdd-<task-n
 - update plan if implementation deviates from original scope
 - keep plan in sync with actual work done
 
+## Solution Overview
+- high-level approach and architecture chosen
+- key design decisions and rationale
+- how it fits into the existing system
+
+## Technical Details
+- data structures and changes
+- parameters and formats
+- processing flow
+
 ## What Goes Where
 - **Implementation Steps** (`[ ]` checkboxes): tasks achievable within this codebase - code changes, tests, documentation updates
 - **Post-Completion** (no checkboxes): items requiring external action - manual testing, changes in consuming projects, deployment configs, third-party verifications
@@ -268,11 +279,6 @@ Example for Regular approach (continued):
 - [ ] update CLAUDE.md if new patterns discovered
 - [ ] move this plan to `docs/plans/completed/`
 
-## Technical Details
-- data structures and changes
-- parameters and formats
-- processing flow
-
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
 
@@ -301,7 +307,7 @@ then use AskUserQuestion:
     "options": [
       {"label": "Execute with subagents", "description": "Run /planning:execute for task-by-task execution with fresh subagents"},
       {"label": "Interactive review", "description": "Open plan in editor for manual annotation and feedback loop"},
-      {"label": "Start implementation", "description": "Begin with task 1 directly"},
+      {"label": "Implement", "description": "Implement task by task in this session"},
       {"label": "Auto review", "description": "Launch AI plan-review agent for automated analysis"},
       {"label": "Done", "description": "No further action"}
     ],
@@ -311,15 +317,28 @@ then use AskUserQuestion:
 ```
 
 - **Execute with subagents**: commit plan, then invoke `/planning:execute <plan-file-path>` to run each task via fresh subagents with automatic code review
-- **Interactive review**: run `python3 $CLAUDE_PLUGIN_ROOT/hooks/plan-annotate.py <plan-file-path>` via Bash.
-  the script opens a copy of the plan in $EDITOR via kitty overlay. if the user makes annotations,
-  it outputs a unified diff to stdout. when diff output is present:
-  1. read the diff carefully — added lines (+) are user annotations, removed lines (-) are deletions, modified lines show requested changes
-  2. revise the plan file to address each annotation
-  3. run `python3 $CLAUDE_PLUGIN_ROOT/hooks/plan-annotate.py <plan-file-path>` again
-  4. repeat until no diff output (user closed editor without changes)
+- **Interactive review**: check if `revdiff` is installed (`which revdiff`).
+  - **if revdiff is available**: run `${CLAUDE_PLUGIN_ROOT}/scripts/launch-plan-review.sh <plan-file-path>` via Bash.
+    the script opens revdiff TUI showing the plan with syntax highlighting. user adds line-level annotations.
+    on quit, annotations are output to stdout in structured format:
+    ```
+    ## filename:line ( )
+    annotation comment text
+    ```
+    when annotation output is present:
+    1. read each annotation — the line number and comment describe what the user wants changed
+    2. revise the plan file to address each annotation
+    3. run `${CLAUDE_PLUGIN_ROOT}/scripts/launch-plan-review.sh <plan-file-path>` via Bash
+    4. repeat until no output (user quit without annotations)
+  - **if revdiff is not available**: fall back to `${CLAUDE_PLUGIN_ROOT}/scripts/plan-annotate.py <plan-file-path>` via Bash.
+    the script opens a copy of the plan in $EDITOR via terminal overlay. if the user makes annotations,
+    it outputs a unified diff to stdout. when diff output is present:
+    1. read the diff carefully — added lines (+) are user annotations, removed lines (-) are deletions, modified lines show requested changes
+    2. revise the plan file to address each annotation
+    3. run `${CLAUDE_PLUGIN_ROOT}/scripts/plan-annotate.py <plan-file-path>` via Bash
+    4. repeat until no diff output (user closed editor without changes)
   when the annotation loop completes, ask again with the remaining options (minus "Interactive review")
-- **Start implementation**: commit plan with message like "docs: add <topic> implementation plan", then begin with task 1 directly
+- **Implement**: begin implementing task 1 interactively in this session. Use TodoWrite tool to track progress and mark todos completed immediately (do not batch)
 - **Auto review**: launch plan-review agent (Task tool with subagent_type=plan-review). After review completes, ask again with the same options (minus "Auto review")
 - **Done**: commit plan with message like "docs: add <topic> implementation plan", stop
 

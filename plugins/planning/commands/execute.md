@@ -1,12 +1,12 @@
 ---
 description: Execute an implementation plan task-by-task using fresh subagents
 argument-hint: path to plan file (or leave empty to find in docs/plans/)
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash, AskUserQuestion, Task, TaskCreate, TaskUpdate, TaskList, Skill
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Task, TaskCreate, TaskUpdate, TaskList, Skill
 ---
 
 # Plan Execution
 
-Execute an implementation plan by spawning a fresh `planning:task-executor` subagent for each task. Execute sequentially, review after each task, and run a comprehensive code review after all tasks complete.
+Execute an implementation plan by spawning a fresh `planning:task-executor` subagent for each task. After all tasks complete, run `/code:sweep` for thorough 3-phase code review with fixes.
 
 ## MANDATORY: Fresh Subagent Per Task
 
@@ -32,7 +32,7 @@ Report to user:
 
 ### Step 2: Create Tracking Tasks
 
-Immediately after parsing, create a TaskCreate for each plan task plus a final review task:
+Immediately after parsing, create a TaskCreate for each plan task plus a sweep task:
 
 ```
 TaskCreate({ subject: "Task N: [Component Name]", activeForm: "Executing Task N: [Component Name]" })
@@ -40,7 +40,7 @@ TaskCreate({ subject: "Task N: [Component Name]", activeForm: "Executing Task N:
 
 Also create:
 ```
-TaskCreate({ subject: "Comprehensive code review", activeForm: "Running comprehensive code review" })
+TaskCreate({ subject: "Code sweep", activeForm: "Running 3-phase code review + fix..." })
 ```
 
 ### Step 3: Execute Tasks Sequentially
@@ -57,25 +57,7 @@ For each task in order:
 5. **Mark task `completed`** via TaskUpdate (or keep `in_progress` on failure)
 6. **Report result**
 
-### Step 4: Quick Review After Each Task
-
-After a task-executor completes successfully:
-
-1. Launch a single `code:reviewer` subagent via Task tool with the list of files created/modified
-2. If issues found (confidence >= 80), auto-fix using Edit/Write tools
-3. Run tests again after fixes to verify nothing broke
-4. Report review results:
-
-```
-Task N/M complete: [Component Name]
-- Created: file1.py, file2.py
-- Tests passing: 3/3
-- Review: Fixed 1 issue (unused import in file1.py:3). Clean otherwise.
-```
-
-If auto-fix breaks tests, revert the fix and report as a skipped issue for comprehensive review.
-
-### Step 5: Handle Failures
+### Step 4: Handle Failures
 
 On task failure:
 1. **Stop immediately** — do not proceed to next task
@@ -97,48 +79,35 @@ On task failure:
 }
 ```
 
-### Step 6: Comprehensive Code Review (MANDATORY)
+### Step 5: Code Sweep (MANDATORY)
 
-> **DO NOT SKIP.** After all tasks complete, invoke `code:code-review` skill for comprehensive review BEFORE reporting final summary.
+> **DO NOT SKIP.** After all tasks complete, run the code sweep.
 
-1. Invoke the code review skill: `Skill("code:review", "comprehensive review of all files created/modified: [list all files]")`
-2. Auto-fix issues with confidence >= 80
-3. Run tests after fixes
-4. If auto-fix breaks tests, revert and report as skipped
-5. Report results:
+Mark code sweep as `in_progress`. Invoke the sweep skill:
 
 ```
-Comprehensive Review Complete
-
-Issues found: N (X critical, Y important)
-Auto-fixed: N
-Skipped (needs user input): N
-
-Fixed:
-- [description] in file.py:42 (confidence: 95)
-
-Skipped:
-- [description] in file.py:100 — [reason]
+Skill("code:sweep", "review all changes on this branch")
 ```
 
-If skipped issues exist, ask user how to handle before final summary.
+The sweep skill handles all 3 review phases (comprehensive, smells, critical) and fixes internally. Wait for it to complete, then mark as `completed`.
 
-### Step 7: Final Summary
+### Step 6: Final Summary
 
 ```
 Execution complete!
 
 Summary:
 - Tasks completed: N/N
-- Files created: X
-- Files modified: Y
-- Tests passing: Z
-- Per-task review fixes: N
-- Comprehensive review fixes: N
-- Issues needing attention: N
+- Code sweep: [sweep results summary]
 
 All tasks from the implementation plan have been executed and reviewed.
 ```
+
+## Key Rules
+
+- Each subagent gets a fresh context — no accumulated state
+- You are the ORCHESTRATOR — never read code, debug, or fix issues yourself
+- If a subagent fails, retry with fresh subagent — do NOT investigate yourself
 
 ## Progress Reporting
 

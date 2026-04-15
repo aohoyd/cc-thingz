@@ -38,10 +38,10 @@ cp plugins/brainstorm/commands/do.md ~/.claude/commands/
 ```bash
 cp -r plugins/code/skills/review ~/.claude/skills/
 cp plugins/code/commands/review.md ~/.claude/commands/
-cp plugins/code/agents/code-explorer.md ~/.claude/agents/
-cp plugins/code/agents/code-architect.md ~/.claude/agents/
-cp plugins/code/agents/code-reviewer.md ~/.claude/agents/
+cp plugins/code/agents/*.md ~/.claude/agents/
 ```
+
+Note: when installed manually, update `${CLAUDE_PLUGIN_ROOT}` references inside `brainstorm/SKILL.md` to use `~/.claude/skills/brainstorm` instead.
 
 **review** — skills (review-pr + git-review + writing-style):
 ```bash
@@ -58,9 +58,11 @@ Note: update the `/review:writing-style` reference inside `pr/SKILL.md` to `/wri
 cp plugins/planning/commands/make.md ~/.claude/commands/
 cp plugins/planning/commands/execute.md ~/.claude/commands/
 cp plugins/planning/agents/task-executor.md ~/.claude/agents/
-cp plugins/planning/hooks/plan-annotate.py ~/.claude/scripts/
+cp plugins/planning/scripts/plan-annotate.py ~/.claude/scripts/
 chmod +x ~/.claude/scripts/plan-annotate.py
 ```
+
+Note: when installed manually, update `${CLAUDE_PLUGIN_ROOT}` references inside `make.md` to use the appropriate local paths instead.
 
 Add the plan-annotate hook to `~/.claude/settings.json`:
 ```json
@@ -125,6 +127,15 @@ Restart Claude Code for changes to take effect.
 
 </details>
 
+## Updating plugins
+
+The `/plugin` menu has two update paths, and they behave differently:
+
+- `/plugin` → **Marketplaces** → **Update marketplace** — pulls the latest plugin catalog from the repo immediately. This is the reliable way to get updates.
+- `/plugin` → **Installed** → **Update now** — uses a local cache that can be stale for a long time and may not reflect recent changes. Use this as a fallback after updating the marketplace.
+
+To keep plugins current automatically, enable `/plugin` → **Marketplaces** → **Enable auto-update**. This updates the marketplace catalog on each session start.
+
 ## Plugins
 
 | Plugin | Description |
@@ -156,17 +167,40 @@ Guides a 4-phase dialogue to turn ideas into designs:
 
 ### code
 
-Code analysis and review tools — parallel code review, codebase exploration, and architecture design agents. Used by brainstorm and planning plugins for codebase-aware workflows.
+Code analysis, review, and fixing tools — specialized reviewer agents, fixer agent, codebase exploration, and architecture design. Used by brainstorm and planning plugins for codebase-aware workflows.
 
 | Component | Trigger | Description |
 |-----------|---------|-------------|
-| skill | `/code:review` | Parallel code review — launches 3 focused reviewer agents, deduplicates findings |
+| skill | `/code:review` | Parallel code review — reports issues, does not fix |
+| skill | `/code:sweep` | Thorough 3-phase review + fix using specialized agents and fixer |
 | command | `/code:review [scope]` | Entry point for code review skill |
 | agent | `explorer` | Deep codebase analysis — traces execution paths, maps architecture layers |
 | agent | `architect` | Architecture design — analyzes patterns, produces implementation blueprints |
 | agent | `reviewer` | Code review — bugs, logic errors, security, conventions with confidence scoring |
+| agent | `reviewer-quality` | Focused review: bugs, security, simplicity |
+| agent | `reviewer-implementation` | Focused review: requirement correctness, wiring, completeness |
+| agent | `reviewer-testing` | Focused review: test coverage, quality, fake test detection |
+| agent | `reviewer-simplification` | Focused review: over-engineering detection |
+| agent | `reviewer-documentation` | Focused review: README/CLAUDE.md update gaps |
+| agent | `reviewer-smells` | Focused review: conventions, code smells, anti-patterns |
+| agent | `fixer` | Verifies review findings, fixes confirmed issues, validates, commits |
 
-**code:review** — two modes: quick (single reviewer, used after individual tasks) and comprehensive (3 parallel reviewers with different focuses: simplicity/DRY, bugs/correctness, conventions/patterns). Consolidates findings, deduplicates, filters by confidence >= 80, groups by severity. Standalone trigger checks `git diff` for unstaged changes.
+**code:review** — reports issues but does NOT fix them. Two modes: quick (single reviewer, used after individual tasks) and comprehensive (3 parallel reviewers with different focuses: simplicity/DRY, bugs/correctness, conventions/patterns). Consolidates findings, deduplicates, filters by confidence >= 80, groups by severity. Standalone trigger checks `git diff` for unstaged changes.
+
+**code:sweep** — thorough 3-phase review that finds AND fixes issues. Used by `/planning:execute` after all tasks complete, or invoke standalone with `/code:sweep`. Phases:
+1. **Comprehensive** (5 agents) — quality, implementation, testing, simplification, documentation reviewers run in parallel. Findings go to fixer. Loops up to 3 iterations until clean.
+2. **Smells** (1 agent) — convention adherence and code quality. Single pass with fixer.
+3. **Critical** (2 agents) — quality + implementation with critical-only constraint. Single pass with fixer.
+
+**Specialized reviewer agents** — six focused reviewers used by `/code:sweep`. Each is read-only (sonnet model) and reports findings in `file:line — description` format:
+- **reviewer-quality** — bugs, security vulnerabilities, error handling, resource management, concurrency
+- **reviewer-implementation** — requirement coverage, correctness of approach, wiring/integration, completeness
+- **reviewer-testing** — missing tests, test quality, fake test detection, edge case coverage
+- **reviewer-simplification** — excessive abstraction, premature generalization, unnecessary indirection
+- **reviewer-documentation** — README/CLAUDE.md documentation gaps for new features, APIs, configs
+- **reviewer-smells** — project convention adherence, dead code, duplicated logic, anti-patterns
+
+**fixer** — receives review findings, verifies each against actual code (20-30 lines of context), fixes confirmed issues, validates (build + tests), commits, and reports structured results. Used by `/code:sweep` after each review phase.
 
 **code-explorer** — traces feature implementations from entry points through all abstraction layers. Outputs file:line references, execution flow, architecture insights, and essential file lists. Used by brainstorm for codebase context gathering.
 
@@ -208,7 +242,7 @@ Structured implementation planning with plan execution via subagents and interac
 | Component | Trigger | Description |
 |-----------|---------|-------------|
 | command | `/planning:make <desc>` | Structured implementation plan with interactive review loop |
-| command | `/planning:execute [path]` | Execute plan task-by-task with fresh subagents and automatic code review |
+| command | `/planning:execute [path]` | Execute plan task-by-task with fresh subagents, then run `/code:sweep` |
 | hook | `PreToolUse` / CLI | Plan annotation in `$EDITOR` with diff-based feedback loop |
 | agent | `plan-review` | Automated plan quality review — completeness, over-engineering, testing |
 | agent | `task-executor` | Executes individual plan tasks following TDD workflow |
@@ -220,7 +254,7 @@ Structured implementation planning with plan execution via subagents and interac
 - **Step 2** — creates the plan file with tasks, file lists, test requirements, and progress tracking. Supports both Regular (checkbox) and TDD (test-first with verify fail/pass steps) task formats
 - **Step 3** — offers interactive review, auto review, execute with subagents (`/planning:execute`), start implementation directly, or done
 
-**execute command** — runs an implementation plan task-by-task using fresh `task-executor` subagents (one per task, mandatory). After each task, launches a quick `code:reviewer` to catch issues early and auto-fixes them. After all tasks complete, runs a comprehensive `code:review` with 3 parallel reviewers. Handles failures gracefully — stops, reports, and asks user to retry/skip/stop.
+**execute command** — runs an implementation plan task-by-task using fresh `task-executor` subagents (one per task, mandatory). After all tasks complete, invokes `/code:sweep` for thorough 3-phase review + fix. Handles failures gracefully — stops, reports, and asks user to retry/skip/stop.
 
 **plan-annotate.py** — interactive plan annotation tool. Opens plans in your `$EDITOR` via a terminal overlay (tmux popup, kitty overlay, or wezterm split-pane), lets you annotate directly, and feeds a unified diff back to Claude so it revises the plan. Two modes:
 
@@ -245,11 +279,11 @@ Release workflow tools for creating versioned releases with auto-generated notes
 | Component | Trigger | Description |
 |-----------|---------|-------------|
 | skill | `/release-tools:new` | Create GitHub/GitLab/Gitea release with auto-versioning and release notes |
-| skill | `/release-tools:last-tag` | Show commits since the last git tag in a formatted table |
+| skill | `/release-tools:last-tag` | Show commits since the last tag in a formatted table |
 
 **release** — full release workflow: asks release type (hotfix/minor/major), auto-detects platform (GitHub/GitLab/Gitea), calculates semantic version, generates release notes grouped by type (features/improvements/fixes) from merged PRs and commits, updates CHANGELOG if present, shows preview for confirmation, then publishes. Includes helper scripts for platform detection, version calculation, and notes generation.
 
-**last-tag** — shows commits since the last git tag in a formatted table with date, author, hash, and description. Detects single vs multiple authors and adjusts table layout. Offers interactive drill-down into individual commit details.
+**last-tag** — shows commits since the last tag in a formatted table with date, author, hash, and description. Detects single vs multiple authors and adjusts table layout. Offers interactive drill-down into individual commit details.
 
 ### thinking-tools
 
@@ -300,6 +334,42 @@ Session workflow helpers for knowledge capture, confusion handling, course corre
 **md-copy** — formats the session's final answer as clean markdown (bold titles instead of headings, proper tables, code blocks) and copies to clipboard. Cross-platform clipboard detection (macOS pbcopy, Linux xclip/xsel).
 
 **txt-copy** — copies generated text (emails, messages, letters) to clipboard via a timestamped temp file. Cross-platform clipboard detection (macOS pbcopy, Linux xclip/xsel).
+
+## Custom Rules
+
+Both the **planning** and **brainstorm** plugins support custom rules injection — free-form markdown files loaded at skill invocation time and applied as additional instructions alongside built-in behavior.
+
+**Two levels**, checked in order (first-found-wins, never merged):
+
+1. **Project-level**: `.claude/<rules-file>.md` in the current working directory
+2. **User-level**: `$CLAUDE_PLUGIN_DATA/<rules-file>.md` (per-plugin persistent storage)
+
+When both non-empty files exist, only the project-level file is used. Empty files are treated as absent and fall through to the next level.
+
+| Plugin | Rules file | Affects |
+|--------|-----------|---------|
+| planning | `planning-rules.md` | make, exec, plan-review |
+| brainstorm | `brainstorm-rules.md` | brainstorm skill |
+
+**Example** — create `.claude/planning-rules.md` in your project:
+
+```markdown
+## testing conventions
+- use table-driven tests with testify
+- mock external dependencies with moq
+- aim for 80% coverage minimum
+
+## plan structure preferences
+- max 5 checkboxes per task
+- always include rollback steps for migrations
+```
+
+**Managing rules** — ask the make command or brainstorm skill to add, show, or clear rules at either level (exec loads rules but management is done through make or brainstorm):
+
+- "show my planning rules" — displays current rules and which level they came from
+- "add Go testing rules to project-level planning rules" — writes to `.claude/planning-rules.md`
+- "set up brainstorm rules from my-conventions.md" — reads file and writes to rules location
+- "clear user-level brainstorm rules" — deletes `$CLAUDE_PLUGIN_DATA/brainstorm-rules.md`
 
 ## Credits
 
