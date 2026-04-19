@@ -26,17 +26,16 @@ returns PreToolUse hook JSON response with permissionDecision:
   - "deny" → changes detected, unified diff sent as denial reason
 
 requirements:
-  - tmux, kitty, or wezterm terminal (tmux tried first, then kitty, then wezterm)
+  - tmux, kitty, wezterm, or ghostty terminal (tmux → kitty → wezterm split → ghostty new window)
   - $EDITOR set (defaults to micro)
   - kitty users: kitty.conf must have allow_remote_control and listen_on configured:
       allow_remote_control yes
       listen_on unix:/tmp/kitty-$KITTY_PID
 
-terminal priority: tmux display-popup → kitty overlay → wezterm split-pane → error
+terminal priority: tmux display-popup → kitty overlay → wezterm split-pane → ghostty new window → error
 
 limitations:
-  - requires tmux, kitty, or wezterm - without any, returns error (no annotation)
-  - does not work in plain terminals (iTerm2, Terminal.app, etc.)
+  - requires tmux, kitty, wezterm, or ghostty — without any, returns error (no annotation)
   - kitty requires KITTY_LISTEN_ON env var (set by kitty when listen_on is configured)
   - the hook blocks until the editor closes; timeout should be set high
   - plan content comes from Claude's ExitPlanMode call, not from the plan
@@ -168,6 +167,17 @@ def open_editor(filepath: Path, target_window: bool = True) -> int:
             time.sleep(0.3)
         sentinel.unlink(missing_ok=True)
         return 0
+
+    # ghostty: new window (fallback — blocks until window closes)
+    if Path("/Applications/Ghostty.app").exists():
+        cwd = os.getcwd()
+        result = subprocess.run(
+            ["open", "-na", "Ghostty.app", "-W", "--args",
+             f"--working-directory={cwd}",
+             "--title=ghostty-claude-plan-review",
+             "-e", "sh", "-c", f'{editor_cmd} {shlex.quote(str(filepath))}'],
+        )
+        return result.returncode
 
     return 1
 

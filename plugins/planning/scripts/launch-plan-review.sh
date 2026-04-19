@@ -78,5 +78,15 @@ if [ -n "${WEZTERM_PANE:-}" ] && command -v wezterm >/dev/null 2>&1; then
     exit 0
 fi
 
+# ghostty: new window (fallback — blocks until window closes)
+if [ -d "/Applications/Ghostty.app" ]; then
+    open -na Ghostty.app -W --args \
+        "--working-directory=$(pwd)" \
+        "--title=ghostty-claude-plan-review" \
+        -e sh -c "$REVDIFF_CMD"
+    cat "$OUTPUT_FILE"
+    exit 0
+fi
+
 echo "error: no overlay terminal available (requires tmux, kitty, or wezterm)" >&2
 exit 1
