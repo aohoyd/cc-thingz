@@ -1,13 +1,13 @@
 ---
 name: sweep
-description: "Use when the user asks to 'sweep my code', 'deep review and fix', 'thorough code review with fixes', 'review and fix everything', 'clean up code', 'sweep changes', or wants a multi-phase code review that finds AND fixes issues. Runs 3 review phases with specialized agents and a fixer agent."
+description: "Use when the user asks to 'sweep my code', 'deep review and fix', 'thorough code review with fixes', 'review and fix everything', 'clean up code', 'sweep changes', or wants a multi-phase code review that finds AND fixes issues. Runs 2 review phases with specialized agents and a fixer agent."
 allowed-tools: ["Read", "Glob", "Grep", "Bash", "Agent", "TaskCreate", "TaskUpdate", "TaskList"]
 argument-hint: "optional: scope, files, or branch to review"
 ---
 
 # Code Sweep
 
-Run a thorough 3-phase code review using specialized reviewer agents, then fix all confirmed findings with the fixer agent. Unlike `/code:review` (which only reports), sweep finds AND fixes issues.
+Run a thorough 2-phase code review using specialized reviewer agents, then fix all confirmed findings with the fixer agent. Unlike `/code:review` (which only reports), sweep finds AND fixes issues.
 
 ## Determine Scope
 
@@ -27,22 +27,20 @@ Store the diff command for reviewer prompts:
 ## Create Tracking Tasks
 
 ```
-TaskCreate({ subject: "Sweep phase 1: comprehensive", activeForm: "Running comprehensive review (5 agents)..." })
-TaskCreate({ subject: "Sweep phase 2: smells", activeForm: "Running smells review..." })
-TaskCreate({ subject: "Sweep phase 3: critical", activeForm: "Running critical-only review..." })
+TaskCreate({ subject: "Sweep phase 1: comprehensive", activeForm: "Running comprehensive review (4 agents)..." })
+TaskCreate({ subject: "Sweep phase 2: verification", activeForm: "Running verification review..." })
 ```
 
-## Phase 1: Comprehensive (5 agents)
+## Phase 1: Comprehensive (4 agents)
 
-Mark phase 1 as `in_progress`. Report: "--- Phase 1: comprehensive (5 agents) ---"
+Mark phase 1 as `in_progress`. Report: "--- Phase 1: comprehensive (4 agents) ---"
 
-Loop up to 3 iterations:
+Loop up to 2 iterations:
 
-1. **Spawn 5 reviewer agents in parallel** — send ALL 5 Agent tool calls in a SINGLE message:
-   - `code:reviewer-quality`
-   - `code:reviewer-implementation`
+1. **Spawn 4 reviewer agents in parallel** — send ALL 4 Agent tool calls in a SINGLE message:
+   - `code:reviewer-correctness`
+   - `code:reviewer-structure`
    - `code:reviewer-testing`
-   - `code:reviewer-simplification`
    - `code:reviewer-documentation`
 
    Give each the same task prompt:
@@ -55,7 +53,7 @@ Loop up to 3 iterations:
    Report ALL findings as: file:line — description
    ```
 
-2. **Collect findings** — gather ALL output from all 5 agents. Deduplicate (same file:line + same issue = merge). Do NOT filter, dismiss, or summarize.
+2. **Collect findings** — gather ALL output from all 4 agents. Deduplicate (same file:line + same issue = merge). Do NOT filter, dismiss, or summarize.
 
 3. **If ALL agents reported zero issues** → report "Phase 1: clean" and proceed to phase 2. Mark as `completed`.
 
@@ -68,27 +66,15 @@ Loop up to 3 iterations:
 
 5. **After fixer returns** → show the FIXES section to user. Loop back to step 1.
 
-If 3 iterations reached with issues still found, report "Phase 1: max iterations reached, moving on". Mark as `completed`.
+If 2 iterations reached with issues still found, report "Phase 1: max iterations reached, moving on". Mark as `completed`.
 
-## Phase 2: Smells (1 agent)
+## Phase 2: Verification (4 agents)
 
-Mark phase 2 as `in_progress`. Report: "--- Phase 2: code smells ---"
+Mark phase 2 as `in_progress`. Report: "--- Phase 2: verification (4 agents) ---"
 
-Single pass (no loop):
+Single pass (no loop, NO fix):
 
-1. **Spawn** `code:reviewer-smells` with the same review prompt as phase 1
-2. **If no issues** → report "Smells: clean" and proceed
-3. **If issues found** → spawn `code:fixer` with findings. Report fixes.
-
-Mark phase 2 as `completed`.
-
-## Phase 3: Critical Only (2 agents)
-
-Mark phase 3 as `in_progress`. Report: "--- Phase 3: critical only (2 agents) ---"
-
-Single pass (no loop):
-
-1. **Spawn 2 agents in parallel** — `code:reviewer-quality` and `code:reviewer-implementation` with modified prompt:
+1. **Spawn 4 agents in parallel** — same 4 agents with modified prompt:
    ```
    Review code changes.
 
@@ -101,10 +87,10 @@ Single pass (no loop):
    Report findings as: file:line — description
    ```
 
-2. **If no issues** → report "Critical: clean"
-3. **If issues found** → spawn `code:fixer` with findings. Report fixes.
+2. **If no issues** → report "Verification: clean"
+3. **If issues found** → report them to user. Do NOT spawn fixer — this is a read-only verification pass.
 
-Mark phase 3 as `completed`.
+Mark phase 2 as `completed`.
 
 ## Final Report
 
@@ -112,8 +98,7 @@ Mark phase 3 as `completed`.
 Sweep complete!
 
 - Phase 1 (comprehensive): N iterations, N fixes
-- Phase 2 (smells): N fixes
-- Phase 3 (critical): N fixes
+- Phase 2 (verification): N remaining issues
 - Total fixes applied: N
 ```
 

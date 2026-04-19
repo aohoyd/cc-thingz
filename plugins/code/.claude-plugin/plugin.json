@@ -1,7 +1,7 @@
 {
   "name": "code",
-  "description": "Code analysis, review, and fixing — review skill (report only), sweep skill (3-phase review + fix), specialized reviewer agents, fixer agent, codebase exploration, and architecture design",
-  "version": "1.2.0",
+  "description": "Code analysis, review, and fixing — review skill (report only), sweep skill (2-phase review + fix), specialized reviewer agents, fixer agent, codebase exploration, and architecture design",
+  "version": "2.0.0",
   "author": {
     "name": "aohoyd"
   },

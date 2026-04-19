@@ -6,7 +6,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Task
 
 # Plan Execution
 
-Execute an implementation plan by spawning a fresh `planning:task-executor` subagent for each task. After all tasks complete, run `/code:sweep` for thorough 3-phase code review with fixes.
+Execute an implementation plan by spawning a fresh `planning:task-executor` subagent for each task. After all tasks complete, run `/code:sweep` for thorough 2-phase code review with fixes.
 
 ## MANDATORY: Fresh Subagent Per Task
 
@@ -40,7 +40,7 @@ TaskCreate({ subject: "Task N: [Component Name]", activeForm: "Executing Task N:
 
 Also create:
 ```
-TaskCreate({ subject: "Code sweep", activeForm: "Running 3-phase code review + fix..." })
+TaskCreate({ subject: "Code sweep", activeForm: "Running 2-phase code review + fix..." })
 ```
 
 ### Step 3: Execute Tasks Sequentially
@@ -89,7 +89,7 @@ Mark code sweep as `in_progress`. Invoke the sweep skill:
 Skill("code:sweep", "review all changes on this branch")
 ```
 
-The sweep skill handles all 3 review phases (comprehensive, smells, critical) and fixes internally. Wait for it to complete, then mark as `completed`.
+The sweep skill handles both review phases (comprehensive, verification) and fixes internally. Wait for it to complete, then mark as `completed`.
 
 ### Step 6: Final Summary
 

@@ -26,7 +26,7 @@ Things to make Claude Code even better — hooks, skills, and commands, organize
 - `.claude-plugin/marketplace.json` — marketplace catalog listing all plugins
 - `plugins/` — each subdirectory is an independent plugin:
   - `plugins/brainstorm/` — collaborative design skill + command
-  - `plugins/code/` — review skill (report only) + sweep skill (3-phase review + fix) + explorer, architect, reviewer agents + specialized reviewer agents (quality, implementation, testing, simplification, documentation, smells) + fixer agent
+  - `plugins/code/` — review skill (report only) + sweep skill (2-phase review + fix) + explorer, architect agents + specialized reviewer agents (correctness, structure, testing, documentation) + fixer agent
   - `plugins/review/` — PR review skill + writing style skill
   - `plugins/planning/` — plan command + execute command + task-executor agent + plan-annotate hook
   - `plugins/release-tools/` — release workflow + last-tag skills
