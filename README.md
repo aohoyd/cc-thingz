@@ -163,7 +163,7 @@ Guides a 4-phase dialogue to turn ideas into designs:
 1. **Understand** — reads project context, launches `code:explorer` subagents in parallel to gather codebase context, asks questions one at a time (multiple choice preferred, uses AskUserQuestion tool exclusively)
 2. **Explore Approaches** — for simple solutions, proposes 2-3 options; for complex ones, launches `code:architect` subagents in parallel. Leads with recommendation
 3. **Present Design** — breaks design into sections of 200-300 words, validates each incrementally via AskUserQuestion
-4. **Next Steps** — offers to save design doc and create plan (`/planning:make`), enter plan mode, or start implementing
+4. **Next Steps** — offers to save design doc and create plan (`/planning:make <design-path>`), enter plan mode, or start implementing. Brainstorm never commits — the design file is left uncommitted; a commit prompt happens later in `/planning:make` or `/code:sweep`
 
 ### code
 
@@ -184,9 +184,9 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 
 **code:review** — reports issues but does NOT fix them. Launches 4 specialized reviewer agents in parallel (correctness, structure, testing, documentation). Consolidates findings, deduplicates, filters by confidence >= 80, groups by severity. Standalone trigger checks `git diff` for unstaged changes.
 
-**code:sweep** — thorough 2-phase review that finds AND fixes issues. Used by `/planning:execute` after all tasks complete, or invoke standalone with `/code:sweep`. Phases:
-1. **Comprehensive** (4 agents) — correctness, structure, testing, documentation reviewers run in parallel. Findings go to fixer. Loops up to 2 iterations until clean.
-2. **Verification** (4 agents) — all reviewers with critical-only filter. Reports remaining issues, no fix.
+**code:sweep** — thorough 2-phase review that finds AND fixes issues. Used by `/planning:execute` after all tasks complete, or invoke standalone with `/code:sweep`. Each phase prints findings to the user, buckets them by severity (`[CRITICAL]`/`[MAJOR]`/`[MINOR]`), creates one task per non-empty bucket, then runs fixers serially in priority order (critical → major → minor). No commits during the run — fixes accumulate in the working tree across both phases (phase 2 uses a working-tree-inclusive diff so it sees uncommitted phase 1 fixes). At the very end, sweep prompts once via AskUserQuestion whether to commit. Phases:
+1. **Comprehensive** (4 agents) — correctness, structure, testing, documentation reviewers run in parallel. Tagged findings go to one fixer batch per severity.
+2. **Verification** (4 agents) — all reviewers with critical-and-major filter. Tagged findings go to one fixer batch per severity.
 
 **Specialized reviewer agents** — four focused reviewers used by both `/code:review` and `/code:sweep`. Each is read-only (sonnet model) and reports findings in `file:line — description` format:
 - **reviewer-correctness** — bugs, security vulnerabilities, logic errors, edge cases, error handling, resource management, concurrency, requirement coverage, wiring/integration
@@ -194,7 +194,7 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 - **reviewer-testing** — missing tests, test quality, fake test detection, edge case coverage
 - **reviewer-documentation** — README/CLAUDE.md documentation gaps for new features, APIs, configs
 
-**fixer** — receives review findings, verifies each against actual code (20-30 lines of context), fixes confirmed issues, validates (build + tests), commits, and reports structured results. Used by `/code:sweep` after each review phase.
+**fixer** — receives review findings, verifies each against actual code (20-30 lines of context), fixes confirmed issues, validates (build + tests), and reports structured results. By default the fixer also commits, but `/code:sweep` overrides this — no commits happen during a sweep; the user is prompted once at the end. Used by `/code:sweep` (one batch per severity, serial).
 
 **code-explorer** — traces feature implementations from entry points through all abstraction layers. Outputs file:line references, execution flow, architecture insights, and essential file lists. Used by brainstorm for codebase context gathering.
 
@@ -239,14 +239,14 @@ Structured implementation planning with plan execution via subagents and interac
 | agent | `plan-review` | Automated plan quality review — completeness, over-engineering, testing |
 | agent | `task-executor` | Executes individual plan tasks following TDD workflow |
 
-**plan command** — creates a plan file in `docs/plans/yyyymmdd-<task-name>.md` through interactive context gathering:
-- **Step 0** — parses intent and explores codebase for relevant context
+**plan command** — creates a plan file in `docs/plans/yyyymmdd-<task-name>.md` through interactive context gathering. No commits during planning — when the user picks "Done" or finishes "Implement", the command prompts via AskUserQuestion whether to commit; "Execute with subagents" defers the commit decision to the end of the execute → sweep chain.
+- **Step 0** — parses intent and explores codebase. If `$ARGUMENTS` is a path to a `*-design.md` file under `docs/plans/`, it's recorded in the plan's `Design:` header so the design file moves to `docs/plans/completed/` alongside the plan on completion
 - **Step 1** — asks focused questions one at a time (goal, scope, constraints, testing approach, title)
 - **Step 1.5** — proposes 2-3 implementation approaches with trade-offs (skipped if obvious)
-- **Step 2** — creates the plan file with tasks, file lists, test requirements, and progress tracking. Supports both Regular (checkbox) and TDD (test-first with verify fail/pass steps) task formats
+- **Step 2** — creates the plan file with `Design:` header, tasks, file lists, test requirements, and progress tracking. Supports both Regular (checkbox) and TDD (test-first with verify fail/pass steps) task formats
 - **Step 3** — offers interactive review, auto review, execute with subagents (`/planning:execute`), start implementation directly, or done
 
-**execute command** — runs an implementation plan task-by-task using fresh `task-executor` subagents (one per task, mandatory). After all tasks complete, invokes `/code:sweep` for thorough 2-phase review + fix. Handles failures gracefully — stops, reports, and asks user to retry/skip/stop.
+**execute command** — runs an implementation plan task-by-task using fresh `task-executor` subagents (one per task, mandatory). After all tasks complete, invokes `/code:sweep` for thorough 2-phase review + fix. The single end-of-workflow commit prompt lives in sweep, covering plan + task changes + sweep fixes together. Handles failures gracefully — stops, reports, and asks user to retry/skip/stop.
 
 **plan-annotate.py** — interactive plan annotation tool. Opens plans in your `$EDITOR` via a terminal overlay (tmux popup, kitty overlay, or wezterm split-pane), lets you annotate directly, and feeds a unified diff back to Claude so it revises the plan. Two modes:
 

@@ -116,11 +116,13 @@ Cover: architecture, components, data flow, error handling, testing.
 
 **You MUST reach this phase before the brainstorm ends.** Design approval in Phase 4 does NOT mean "start implementing". Always ask the user how to proceed.
 
+**No commits during brainstorm.** Do NOT run `git commit` or `git add` at any point — not when saving the design, not at hand-off to other commands. Any commit prompt happens later inside `/planning:make` or `/code:sweep`.
+
 AskUserQuestion with options: "Write plan" / "Plan mode" / "Start now"
 
-- **Write plan**: save to `docs/plans/YYYY-MM-DD-<topic>-design.md`, then invoke `/planning:make`
+- **Write plan**: save the design to `docs/plans/YYYY-MM-DD-<topic>-design.md` (do NOT commit it). Then invoke `/planning:make <design-path>`, passing the design file path as the argument so the resulting plan can reference it in its `Design:` header and move both files together on completion.
 - **Plan mode**: use EnterPlanMode tool
-- **Start now**: implement directly with TaskCreate tracking
+- **Start now**: implement directly with TaskCreate tracking. Do NOT commit during implementation; if the user wants a commit at the end, they will ask.
 
 ## Key Principles
 

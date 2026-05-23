@@ -8,11 +8,17 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Task
 
 create an implementation plan in `docs/plans/yyyymmdd-<task-name>.md` with interactive context gathering.
 
+**No commits during planning.** This command never runs `git commit`. When the user is fully done (picks "Done" or finishes "Implement"), the command prompts via AskUserQuestion whether to commit the plan / changes. "Execute with subagents" defers the commit decision to the end of `/planning:execute` → `/code:sweep`.
+
 ## step 0: parse intent and gather context
 
 before asking questions, understand what the user is working on:
 
 1. **parse user's command arguments** to identify intent:
+   - if `$ARGUMENTS` looks like a path under `docs/plans/` ending in `-design.md`:
+     - verify the file exists (`test -f <path>`)
+     - if it exists, store the path for the plan's `Design:` header (step 2) and read the file content as additional context for the rest of step 0
+     - if it does NOT exist, ask the user via AskUserQuestion whether to proceed without a design link (Yes → store `none`) or supply a correct path. Do NOT silently record a dead reference.
    - "add feature Z" / "implement W" → feature development
    - "fix bug" / "debug issue" → bug fix plan
    - "refactor X" / "improve Y" → refactoring plan
@@ -126,6 +132,8 @@ check `docs/plans/` for existing files, then create `docs/plans/yyyymmdd-<task-n
 **Architecture:** [2-3 sentences about approach]
 
 **Tech Stack:** [key technologies/libraries]
+
+**Design:** [relative path to source design file under `docs/plans/`, or `none`]
 
 ## Overview
 - clear description of the feature/change being implemented
@@ -277,7 +285,8 @@ Example for Regular approach (continued):
 ### Task N: [Final] Update documentation
 - [ ] update README.md if needed
 - [ ] update CLAUDE.md if new patterns discovered
-- [ ] move this plan to `docs/plans/completed/`
+- [ ] move this plan to `docs/plans/completed/` (create dir if needed)
+- [ ] move the linked design file too, if any. Extract the value with: `grep -E '^\*\*Design:\*\*' <plan-file> | sed 's/^\*\*Design:\*\* *//'`. If the extracted value is empty, the literal placeholder text, or `none`, skip. Otherwise `test -f <design-path>` and `mv <design-path> docs/plans/completed/` — if the file is missing, print a warning and continue.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
@@ -316,7 +325,7 @@ then use AskUserQuestion:
 }
 ```
 
-- **Execute with subagents**: commit plan, then invoke `/planning:execute <plan-file-path>` to run each task via fresh subagents with automatic code review
+- **Execute with subagents**: do NOT commit the plan. Invoke `/planning:execute <plan-file-path>` directly. The execute → sweep chain prompts about committing everything (plan + task changes + sweep fixes) once at the very end.
 - **Interactive review**: check if `revdiff` is installed (`which revdiff`).
   - **if revdiff is available**: run `${CLAUDE_PLUGIN_ROOT}/scripts/launch-plan-review.sh <plan-file-path>` via Bash.
     the script opens revdiff TUI showing the plan with syntax highlighting. user adds line-level annotations.
@@ -338,9 +347,9 @@ then use AskUserQuestion:
     3. run `${CLAUDE_PLUGIN_ROOT}/scripts/plan-annotate.py <plan-file-path>` via Bash
     4. repeat until no diff output (user closed editor without changes)
   when the annotation loop completes, ask again with the remaining options (minus "Interactive review")
-- **Implement**: begin implementing task 1 interactively in this session. Use TodoWrite tool to track progress and mark todos completed immediately (do not batch)
+- **Implement**: begin implementing task 1 interactively in this session. Use TodoWrite tool to track progress and mark todos completed immediately (do not batch). Do NOT commit during implementation. When the user finishes implementing (or pauses), call AskUserQuestion with "Commit all changes now?" (Yes/No). On Yes: `git add -A && git commit -m "<topic>: implement <plan-title>"`. On No: leave uncommitted.
 - **Auto review**: launch plan-review agent (Task tool with subagent_type=plan-review). After review completes, ask again with the same options (minus "Auto review")
-- **Done**: commit plan with message like "docs: add <topic> implementation plan", stop
+- **Done**: do NOT auto-commit. Call AskUserQuestion: "Plan file is ready. Commit it now?" with options Yes / No. On Yes: `git add <plan-file-path> && git commit -m "docs: add <topic> implementation plan"`. On No: leave the plan uncommitted in `docs/plans/`. Either way, stop after this prompt.
 
 ## execution enforcement
 
@@ -372,8 +381,12 @@ then use AskUserQuestion:
 5. **on completion**:
    - verify all checkboxes marked
    - run final test suite
-   - move plan to `docs/plans/completed/`
    - create directory if needed: `mkdir -p docs/plans/completed`
+   - move plan to `docs/plans/completed/`
+   - read the plan header's `Design:` field (parse via `grep -E '^\*\*Design:\*\*' <plan-file> | sed 's/^\*\*Design:\*\* *//'`). If the extracted value is empty, the literal template placeholder, or `none`, skip. Otherwise verify the file exists and move it to `docs/plans/completed/`
+   - do NOT commit here. Which commit prompt applies depends on how this plan is being executed:
+     - if the user picked "Execute with subagents" from step 3, sweep at the end of `/planning:execute` issues the only commit prompt
+     - if the user picked "Implement" from step 3, the in-session prompt described under "Implement" is the only commit prompt
 
 6. **partial implementation exception**:
    - if a task provides partial implementation where tests cannot pass until a later task:
