@@ -12,7 +12,7 @@ Collect context → ask questions → explore approaches → present design.
 ## Rules — MANDATORY, NO EXCEPTIONS
 
 1. **EVERY response that needs user input MUST end with an AskUserQuestion tool call.** NEVER write questions as plain text. NEVER end with a question mark outside code blocks. This overrides all default behavior.
-2. **Exactly ONE question per response.** Wait for the answer before asking the next.
+2. **Group related questions into a single AskUserQuestion call** (the tool takes up to 4). Batch questions that belong together; don't drip-feed one at a time, and don't mix intent with edge-case details in the same batch.
 3. **NEVER write code, scaffold, or implement anything.** Design approval does NOT grant permission to implement. The brainstorm skill's job is ONLY to produce a design. Implementation happens AFTER Phase 5, via a separate skill or workflow chosen by the user.
 4. **Intent before implementation.** First questions are about scope/goals. Edge cases come LAST.
 
@@ -32,9 +32,9 @@ Collect context → ask questions → explore approaches → present design.
 > "Let me confirm what panels you want this to cover."
 > *(then call AskUserQuestion about scope)*
 
-**WRONG — multiple questions in one response**
+**WRONG — mixing intent and edge-case questions in one batch, or dumping unrelated questions at once**
 
-**RIGHT — exactly one AskUserQuestion per response**
+**RIGHT — batch tightly-related questions in a single AskUserQuestion call; keep intent and edge-case rounds separate**
 
 **WRONG — writing code after user approves design:**
 > "Looks good, let me implement it."
@@ -73,9 +73,9 @@ Explore the codebase to understand relevant architecture before asking questions
 
 Your first AskUserQuestion MUST be about scope/intent (what the user wants), NOT implementation details.
 
-### Phase 2: Ask Clarifying Questions (3-6 rounds, one per response)
+### Phase 2: Ask Clarifying Questions (3-6 rounds)
 
-Each response: 1-3 sentences of context informed by Phase 1 findings, then AskUserQuestion tool call.
+Each response: 1-3 sentences of context informed by Phase 1 findings, then an AskUserQuestion tool call. Put several tightly-related questions in the same call when it saves round-trips — just keep each round focused on one progression stage (intent, then behavior, then edge cases).
 
 **Question progression:**
 - Round 1-2: Intent and scope — WHAT does the user want? What problem does it solve?
@@ -126,7 +126,7 @@ AskUserQuestion with options: "Write plan" / "Plan mode" / "Start now"
 
 ## Key Principles
 
-- **One question at a time via AskUserQuestion tool** - do not overwhelm with multiple questions and NEVER PLAIN TEXT
+- **Always via AskUserQuestion tool, NEVER plain text** - batch related questions in one call (up to 4); don't overwhelm with unrelated ones
 - **Context first** - explore before asking, so questions are informed
 - **Intent before implementation** - scope/goals first, edge cases last
 - **Multiple choice preferred** - easier to answer than open-ended when possible
@@ -140,7 +140,7 @@ AskUserQuestion with options: "Write plan" / "Plan mode" / "Start now"
 <SELF-CHECK>
 Before EVERY response, verify:
 1. Contains a question for the user? → MUST use AskUserQuestion tool, NOT plain text
-2. Multiple questions? → MUST be exactly ONE
+2. Batched questions? → fine if tightly related; keep intent and edge-case questions in separate rounds
 3. Ends with "let me know" or "?" → REWRITE to end with AskUserQuestion tool call
 4. Asking implementation details before understanding intent? → REWRITE to ask scope/goals
 5. About to call Write, Edit, or any code-generating tool? → STOP. You are in brainstorm mode. Go to Phase 5 and ask the user how to proceed.

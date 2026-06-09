@@ -162,7 +162,7 @@ check `docs/plans/` for existing files, then create `docs/plans/yyyymmdd-<task-n
 - maintain backward compatibility
 
 ## Testing Strategy
-- **unit tests**: required for every task (see Development Approach above)
+- **unit tests**: required for every task — see the testing mandate in Development Approach above (not restated here)
 - **e2e tests**: if project has UI-based e2e tests (Playwright, Cypress, etc.):
   - UI changes → add/update e2e tests in same task as UI code
   - backend changes supporting UI → add/update e2e tests in same task
@@ -199,12 +199,7 @@ Task structure guidelines:
 - Use specific descriptive names, not generic "[Core Logic]" or "[Implementation]"
 - Each task MUST have a **Files:** block listing files to Create/Modify (before checkboxes)
 - Aim for ~5 checkboxes per task (more is OK if logically atomic)
-- **CRITICAL: Each task MUST end with writing/updating tests before moving to next**
-  - tests are not optional - they are a required deliverable of every task
-  - write tests for all NEW code added in this task
-  - write tests for all MODIFIED code in this task
-  - include both success and error scenarios in tests
-  - list tests as SEPARATE checklist items, not bundled with implementation
+- **Tests per task**: apply the testing mandate from Development Approach above. The only format-specific rule here: list tests as SEPARATE checklist items, not bundled with implementation.
 
 Example for Regular approach (NOTICE: Files block + tests as separate checklist items):
 
