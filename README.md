@@ -173,6 +173,7 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 |-----------|---------|-------------|
 | skill | `/code:review` | Parallel code review — reports issues, does not fix |
 | skill | `/code:sweep` | Thorough 2-phase review + fix using specialized agents and fixer |
+| skill | `/code:use-modern-go` | Modern Go syntax guidelines scoped to the project's detected Go version |
 | command | `/code:review [scope]` | Entry point for code review skill |
 | agent | `explorer` | Deep codebase analysis — traces execution paths, maps architecture layers |
 | agent | `architect` | Architecture design — analyzes patterns, produces implementation blueprints |
@@ -199,6 +200,8 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 **code-explorer** — traces feature implementations from entry points through all abstraction layers. Outputs file:line references, execution flow, architecture insights, and essential file lists. Used by brainstorm for codebase context gathering.
 
 **code-architect** — designs feature architectures by analyzing existing codebase patterns. Outputs decisive blueprints with component design, implementation maps, data flows, and build sequences. Used by brainstorm for approach exploration on complex features.
+
+**code:use-modern-go** — detects the project's Go version from `go.mod` and provides modern Go syntax guidelines (built-ins, `slices`/`maps`/`cmp`, iterators, etc.) up to and including that version. The `architect`, `reviewer-correctness`, and `fixer` agents invoke this skill automatically when they detect Go code (a `go.mod` or `.go` files) so designs, reviews, and fixes follow current idioms.
 
 ### review
 
@@ -239,7 +242,7 @@ Structured implementation planning with plan execution via subagents and interac
 | agent | `plan-review` | Automated plan quality review — completeness, over-engineering, testing |
 | agent | `task-executor` | Executes individual plan tasks following TDD workflow |
 
-**plan command** — creates a plan file in `docs/plans/yyyymmdd-<task-name>.md` through interactive context gathering. No commits during planning — when the user picks "Done" or finishes "Implement", the command prompts via AskUserQuestion whether to commit; "Execute with subagents" defers the commit decision to the end of the execute → sweep chain.
+**plan command** — creates a plan file in `docs/plans/YYYY-MM-DD-<task-name>.md` through interactive context gathering. No commits during planning — when the user picks "Done" or finishes "Implement", the command prompts via AskUserQuestion whether to commit; "Execute with subagents" defers the commit decision to the end of the execute → sweep chain.
 - **Step 0** — parses intent and explores codebase. If `$ARGUMENTS` is a path to a `*-design.md` file under `docs/plans/`, it's recorded in the plan's `Design:` header so the design file moves to `docs/plans/completed/` alongside the plan on completion
 - **Step 1** — asks focused questions one at a time (goal, scope, constraints, testing approach, title)
 - **Step 1.5** — proposes 2-3 implementation approaches with trade-offs (skipped if obvious)

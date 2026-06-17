@@ -6,7 +6,7 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash, Agent, AskUserQuestion, Task
 
 # Implementation Plan Creation
 
-create an implementation plan in `docs/plans/yyyymmdd-<task-name>.md` with interactive context gathering.
+create an implementation plan in `docs/plans/YYYY-MM-DD-<task-name>.md` with interactive context gathering.
 
 **No commits during planning.** This command never runs `git commit`. When the user is fully done (picks "Done" or finishes "Implement"), the command prompts via AskUserQuestion whether to commit the plan / changes. "Execute with subagents" defers the commit decision to the end of `/planning:execute` → `/code:sweep`.
 
@@ -118,7 +118,7 @@ use AskUserQuestion tool to let user select preferred approach before creating t
 
 ## step 2: create plan file
 
-check `docs/plans/` for existing files, then create `docs/plans/yyyymmdd-<task-name>.md` (use current date):
+check `docs/plans/` for existing files, then create `docs/plans/YYYY-MM-DD-<task-name>.md` (use current date):
 
 ### plan structure
 
@@ -299,7 +299,7 @@ Example for Regular approach (continued):
 
 ## step 3: next steps
 
-after creating the file, tell user: "created plan: `docs/plans/yyyymmdd-<task-name>.md`"
+after creating the file, tell user: "created plan: `docs/plans/YYYY-MM-DD-<task-name>.md`"
 
 then use AskUserQuestion:
 
