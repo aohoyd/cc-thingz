@@ -17,7 +17,7 @@
     {
       "name": "code",
       "source": "./plugins/code",
-      "description": "Code analysis, review, and fixing — specialized reviewer agents, fixer agent, codebase exploration, and architecture design"
+      "description": "Code analysis, review, and fixing — specialized reviewer agents, fixer agent, codebase exploration, architecture design, and ponytail anti-over-engineering skills"
     },
     {
       "name": "planning",

@@ -174,6 +174,11 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 | skill | `/code:review` | Parallel code review — reports issues, does not fix |
 | skill | `/code:sweep` | Thorough 2-phase review + fix using specialized agents and fixer |
 | skill | `/code:use-modern-go` | Modern Go syntax guidelines scoped to the project's detected Go version |
+| skill | `/code:ponytail` | Lazy-senior-dev mode — forces the simplest solution that works (YAGNI → stdlib → native → one line) |
+| skill | `/code:ponytail-review` | Review a diff for over-engineering only — delete-list, one line per finding |
+| skill | `/code:ponytail-audit` | Whole-repo over-engineering audit — ranked delete-list |
+| skill | `/code:ponytail-debt` | Harvest `ponytail:` shortcut comments into a tracked debt ledger |
+| skill | `/code:ponytail-help` | Quick-reference card for the ponytail skills and intensity levels |
 | command | `/code:review [scope]` | Entry point for code review skill |
 | agent | `explorer` | Deep codebase analysis — traces execution paths, maps architecture layers |
 | agent | `architect` | Architecture design — analyzes patterns, produces implementation blueprints |
@@ -202,6 +207,13 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 **code-architect** — designs feature architectures by analyzing existing codebase patterns. Outputs decisive blueprints with component design, implementation maps, data flows, and build sequences. Used by brainstorm for approach exploration on complex features.
 
 **code:use-modern-go** — detects the project's Go version from `go.mod` and provides modern Go syntax guidelines (built-ins, `slices`/`maps`/`cmp`, iterators, etc.) up to and including that version. The `architect`, `reviewer-correctness`, and `fixer` agents invoke this skill automatically when they detect Go code (a `go.mod` or `.go` files) so designs, reviews, and fixes follow current idioms.
+
+**ponytail skills** — a set of "lazy senior dev" skills adapted from [ponytail](https://github.com/DietrichGebert/ponytail) (MIT, by Dietrich Gebert), ported as skills only (no always-on hooks):
+- **code:ponytail** — forces the laziest solution that actually works. Climbs a ladder before writing code (does it need to exist at all → stdlib → native platform feature → one line → minimum), refuses unrequested abstractions, and marks deliberate shortcuts with `ponytail:` comments. Has three intensities — `lite` (name the lazier option), `full` (the ladder enforced, default), `ultra` (deletion-first, challenges the requirement). Without the upstream hooks it activates on invocation and stays active for the rest of the conversation; say "stop ponytail" or "normal mode" to revert.
+- **code:ponytail-review** — reviews the current diff for over-engineering only (not correctness). One line per finding, tagged `delete`/`stdlib`/`native`/`yagni`/`shrink`, ending with net lines removable. Lists fixes, applies nothing.
+- **code:ponytail-audit** — same as ponytail-review but scans the whole repo instead of a diff, ranked biggest cut first.
+- **code:ponytail-debt** — greps the repo for `ponytail:` shortcut comments and collects them into a debt ledger so deferrals get tracked instead of forgotten; flags any marker that names no upgrade trigger.
+- **code:ponytail-help** — one-shot reference card for the ponytail skills and intensity levels.
 
 ### review
 
