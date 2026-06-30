@@ -275,7 +275,18 @@ allow_remote_control yes
 listen_on unix:/tmp/kitty-$KITTY_PID
 ```
 
-Run tests: `python3 plugins/planning/hooks/plan-annotate.py --test`
+*Note*: when `revdiff` is installed, the `ExitPlanMode` hook and `/planning:make` interactive review both route through `launch-plan-review.sh` instead, which supports a wider set of overlays: agterm, tmux, zellij, herdr, kitty, wezterm/kaku, cmux, ghostty, iTerm2, and emacs vterm. The 3-terminal list above applies only to the `$EDITOR` fallback when revdiff is not installed.
+
+*Disabling review*: set `PLANNING_DISABLE_REVDIFF=1` to skip interactive plan review entirely on both routes (revdiff and the `$EDITOR` fallback). No overlay opens and the plan proceeds to the normal `ExitPlanMode` confirmation. This exists for remote clients (`claude /remote-control`): the overlay always opens on the host terminal, which a mobile or web client cannot see or interact with, so review would otherwise block the session. The variable is read when review fires, so export it in your shell before starting a session you may later drive remotely.
+
+The overlay popup size is configurable via env vars:
+
+| Env var | Description | Default |
+|---------|-------------|---------|
+| `REVDIFF_POPUP_WIDTH` | Tmux/Zellij popup width (e.g., `100%`, `80%`) | `90%` |
+| `REVDIFF_POPUP_HEIGHT` | Tmux/Zellij popup height / wezterm split percent | `90%` |
+
+Run tests: `python3 plugins/planning/scripts/plan-annotate.py --test`
 
 **plan-review agent** — automated plan quality reviewer. Analyzes plans for problem definition, solution correctness, scope creep, over-engineering, testing requirements, task granularity, and convention adherence. Used by the plan command's "Auto review" option. Outputs a structured report with severity-rated findings and an APPROVE/NEEDS REVISION verdict.
 
@@ -298,11 +309,11 @@ Analytical thinking tools for objective analysis.
 
 | Component | Trigger | Description |
 |-----------|---------|-------------|
-| skill | `/thinking-tools:ask-codex` | Consult OpenAI Codex (GPT-5) for investigation, debugging, or code review |
+| skill | `/thinking-tools:ask-codex` | Consult OpenAI Codex (GPT-5.5) for investigation, debugging, or code review |
 | skill | `/thinking-tools:dialectic <statement>` | Prove and counter-prove a statement using parallel agents |
 | skill | `/thinking-tools:root-cause-investigator` | Systematic 5-Why root cause analysis for errors and bugs |
 
-**ask-codex** — consults OpenAI Codex (GPT-5) as a second opinion for debugging, investigation, or code review. Builds a focused prompt from conversation context, runs codex in read-only sandbox mode in the background, and presents findings with an independent assessment. Requires `codex` CLI to be installed and authenticated.
+**ask-codex** — consults OpenAI Codex (GPT-5.5) as a second opinion for debugging, investigation, or code review. Builds a focused prompt from conversation context, runs codex in read-only sandbox mode in the background, and presents findings with an independent assessment. Requires `codex` CLI to be installed and authenticated.
 
 **dialectic** — runs two agents in parallel with opposing goals (thesis vs antithesis) to eliminate confirmation bias. One agent finds all positive evidence, the other finds all negative evidence. After both complete, synthesizes findings into an objective conclusion and verifies cited evidence against actual code.
 
@@ -326,13 +337,13 @@ Session workflow helpers for knowledge capture, confusion handling, course corre
 
 | Component | Trigger | Description |
 |-----------|---------|-------------|
-| skill | `/workflow:learn` | Capture strategic project knowledge to local CLAUDE.md |
+| skill | `/workflow:learn` | Capture strategic project knowledge to project CLAUDE.md (routes per-developer / per-checkout discoveries to CLAUDE.local.md when that file is present) |
 | skill | `/workflow:clarify` | Investigate and explain user confusion, determine if real issue exists |
 | skill | `/workflow:wrong` | Reset and re-evaluate when current approach isn't working |
 | skill | `/workflow:md-copy` | Format final answer as markdown and copy to clipboard |
 | skill | `/workflow:txt-copy` | Copy generated text content to clipboard |
 
-**learn** — reviews conversation history, extracts strategic project knowledge (architecture patterns, conventions, operational insights), and saves selected items to local CLAUDE.md. Uses granular selection via AskUserQuestion so the user picks exactly what to keep.
+**learn** — reviews conversation history, extracts strategic project knowledge (architecture patterns, conventions, operational insights), and saves selected items to the project CLAUDE.md. When `CLAUDE.local.md` is present, per-developer / per-checkout discoveries (machine-specific tooling, environment quirks) are routed there instead. Defers to any project-defined memory-placement guidance documented in `CLAUDE.md` or `.claude/rules/`. Uses granular selection via AskUserQuestion so the user picks exactly what to keep.
 
 **clarify** — activates on confusion signals ("I don't understand", "why is this happening", etc.). Investigates the actual codebase to determine whether the confusion stems from a misunderstanding or a real issue. If real, proceeds to plan mode for a fix.
 

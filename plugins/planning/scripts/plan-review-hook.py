@@ -12,7 +12,9 @@ returns PreToolUse hook JSON response with permissionDecision:
 
 requirements:
   - revdiff (preferred) or $EDITOR (fallback)
-  - tmux, kitty, or wezterm terminal
+  - revdiff path: agterm, tmux, zellij, herdr, kitty, wezterm, kaku, cmux,
+    ghostty, iTerm2, or emacs vterm
+  - $EDITOR fallback (plan-annotate.py): tmux, kitty, or wezterm
 """
 
 import json
@@ -93,6 +95,14 @@ def main() -> None:
     plan_content = read_plan_from_stdin()
     if not plan_content:
         make_response("ask", "no plan content in hook event")
+        return
+
+    # skip interactive review entirely when disabled (e.g. claude /remote-control, where
+    # a host terminal overlay would be invisible to the remote client and block the
+    # session). falls through to the normal ExitPlanMode confirmation, which the remote
+    # client can see and act on. covers both revdiff and the plan-annotate.py fallback.
+    if os.environ.get("PLANNING_DISABLE_REVDIFF"):
+        make_response("ask", "plan review disabled via PLANNING_DISABLE_REVDIFF")
         return
 
     plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
