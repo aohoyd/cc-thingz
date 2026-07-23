@@ -4,6 +4,19 @@ This repo ships independent Claude Code plugins. Version headings use values fro
 
 Entries are sorted by plugin version date, newest first.
 
+## code v2.4.0 - 2026-07-22
+
+### New Features
+
+- review: mirror consolidated findings into a live Hunk session as inline comments when the `hunk` CLI is installed and a session is open for the reviewed repo. The session is reloaded to the reviewed diff so line numbers match, stale agent comments from previous runs are cleared, and all findings are pushed in one `comment apply` batch (summary = severity + description, rationale = suggested fix + confidence). The screen report stays canonical; the step skips silently when hunk or a session is absent. Hunk's bundled session-CLI skill is vendored at `skills/review/references/hunk-review.md` (from hunk v0.17.3)
+
+### Improvements
+
+- review: reviewer prompt now requires severity tags (`[CRITICAL]`/`[IMPORTANT]`), a suggested fix, and a calibrated 0-100 confidence in each finding — consolidation and the Hunk comment summaries previously consumed severity that no agent was asked to produce
+- review: Hunk mirroring step hardened — bail-out paths use named targets instead of ambiguous step numbers, the batch JSON temp file must live outside the repo and is deleted after apply (a report-only skill never pollutes the reviewed diff), batch rejection falls back to per-comment `comment add`, the vendored CLI reference is read only on errors and marked command-reference-only, and a custom `$ARGUMENTS` scope now gets a stored diff command
+- review: added `argument-hint`, dropped unused task tools from `allowed-tools` (skill and command), renamed the command's subagent tool `Task` → `Agent` to match the skills
+- reviewer-structure: over-engineering section rebuilt around ponytail's ladder, rules, and constraints — a finding is code sitting lower on the ladder than it could (should it exist at all → stdlib → native platform feature → already-installed dependency → shorter form). Rules flag unrequested abstractions, pass-through layers, and unnecessary fallbacks, and treat `ponytail:` comments as deliberate intent rather than findings. Constraints keep smoke tests, trust-boundary validation, security/accessibility code, explicitly requested features, and hardware calibration knobs off the delete list. Every finding names its concrete replacement and net line change. Benefits both `/code:review` and `/code:sweep`, which share the agent
+
 ## planning v3.8.1 - 2026-06-29
 
 ### Bug Fixes

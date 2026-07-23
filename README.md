@@ -188,7 +188,7 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 | agent | `reviewer-documentation` | Focused review: README/CLAUDE.md update gaps |
 | agent | `fixer` | Verifies review findings, fixes confirmed issues, validates, commits |
 
-**code:review** — reports issues but does NOT fix them. Launches 4 specialized reviewer agents in parallel (correctness, structure, testing, documentation). Consolidates findings, deduplicates, filters by confidence >= 80, groups by severity. Standalone trigger checks `git diff` for unstaged changes.
+**code:review** — reports issues but does NOT fix them. Launches 4 specialized reviewer agents in parallel (correctness, structure, testing, documentation). Consolidates findings, deduplicates, filters by confidence >= 80, groups by severity. Standalone trigger checks `git diff` for unstaged changes. If the [hunk](https://hunk.dev/) CLI is installed and a live Hunk session is open for the reviewed repo, findings are also mirrored into the session as inline comments — the session is reloaded to the reviewed diff first, stale agent comments are cleared, and all findings land in one batch (severity + description as the summary, suggested fix + confidence as the rationale; per-comment fallback if the batch is rejected). The screen report stays canonical; without hunk the review is unchanged.
 
 **code:sweep** — thorough 2-phase review that finds AND fixes issues. Used by `/planning:execute` after all tasks complete, or invoke standalone with `/code:sweep`. Each phase prints findings to the user, buckets them by severity (`[CRITICAL]`/`[MAJOR]`/`[MINOR]`), creates one task per non-empty bucket, then runs fixers serially in priority order (critical → major → minor). No commits during the run — fixes accumulate in the working tree across both phases (phase 2 uses a working-tree-inclusive diff so it sees uncommitted phase 1 fixes). At the very end, sweep prompts once via AskUserQuestion whether to commit. Phases:
 1. **Comprehensive** (4 agents) — correctness, structure, testing, documentation reviewers run in parallel. Tagged findings go to one fixer batch per severity.
@@ -196,7 +196,7 @@ Code analysis, review, and fixing tools — specialized reviewer agents, fixer a
 
 **Specialized reviewer agents** — four focused reviewers used by both `/code:review` and `/code:sweep`. Each is read-only (sonnet model) and reports findings in `file:line — description` format:
 - **reviewer-correctness** — bugs, security vulnerabilities, logic errors, edge cases, error handling, resource management, concurrency, requirement coverage, wiring/integration
-- **reviewer-structure** — over-engineering, code smells, convention adherence, anti-patterns, dead code, duplication, naming
+- **reviewer-structure** — code smells, convention adherence, anti-patterns, dead code, duplication, naming. Over-engineering is judged against ponytail's ladder (should it exist at all → stdlib → native platform → installed dependency → shorter form) plus its rules and constraints — `ponytail:` markers read as intent, smoke tests and trust-boundary code never flagged; every finding names its concrete replacement and net line change
 - **reviewer-testing** — missing tests, test quality, fake test detection, edge case coverage
 - **reviewer-documentation** — README/CLAUDE.md documentation gaps for new features, APIs, configs
 
