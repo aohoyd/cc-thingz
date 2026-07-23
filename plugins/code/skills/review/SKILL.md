@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Use when the user asks to 'review my code', 'check this code', 'review changes', 'code review', 'review what I wrote', 'check for bugs', or wants quality feedback on recent code changes. Launches 4 parallel reviewer agents and reports consolidated findings with confidence-based filtering."
+description: "Use when the user asks to 'review my code', 'check this code', 'review changes', 'code review', 'review current branch', 'review this branch', 'make a code review', 'review what I wrote', 'check for bugs', or wants quality feedback on recent code changes. Launches 4 parallel reviewer agents and reports consolidated findings with confidence-based filtering."
 allowed-tools: ["Read", "Write", "Glob", "Grep", "Bash", "Agent", "AskUserQuestion"]
 argument-hint: "optional scope: files, directories, or a branch/commit range"
 ---
@@ -33,12 +33,14 @@ Store the diff command for reviewer prompts:
    - `code:reviewer-testing`
    - `code:reviewer-documentation`
 
-   Give each the same task prompt:
+   Give each the same core task prompt (appending a short per-specialty focus line or known project context is fine — do not rewrite the core):
    ```
    Review code changes.
 
    Run `<diff-command>` to see all changes.
    Read source files for full context — do not review from diff alone.
+   Only report issues introduced by this diff — verify provenance (diff hunks / git blame); pre-existing issues go in a separate PRE-EXISTING section.
+   Do NOT run the project's full build or test suite. Never run interactive/UI-driving tests.
 
    Tag each finding with severity:
    - [CRITICAL] — bugs, security vulnerabilities, data loss, broken functionality
@@ -51,7 +53,9 @@ Store the diff command for reviewer prompts:
 2. **Consolidate findings** — gather ALL output from all 4 agents:
    - Deduplicate: same file:line + same issue = merge
    - Filter: only keep issues with confidence >= 80
+   - **Verify criticals yourself**: independently confirm each [CRITICAL] finding in the source before reporting it (agents have produced factually wrong findings; your report is the canonical output). Mark verified ones "(verified)"
    - Sort by severity: Critical first, then Important
+   - Keep reviewer-reported PRE-EXISTING items in their own section at the end of the report — labeled as such, never mixed into the branch findings
 
 3. **Sync a live Hunk session** (optional — skip silently when hunk or a session is unavailable; if a command errors mid-way, continue and note it). Run this even with zero findings, so the session never shows stale results:
    1. Detect: run `command -v hunk && hunk session get --repo "$(git rev-parse --show-toplevel)" --json`. If either fails (hunk not installed, no live session for this repo), skip the rest of this step and go to **Report results**.

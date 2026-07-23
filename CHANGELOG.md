@@ -4,6 +4,83 @@ This repo ships independent Claude Code plugins. Version headings use values fro
 
 Entries are sorted by plugin version date, newest first.
 
+## planning v4.3.0 - 2026-07-23
+
+### Improvements
+
+- plan-review: drops its hardcoded `opus` pin for `inherit` — the alias resolves to Opus 4.8, which now sits below the Claude 5 family, so the pin silently downgraded plan review in sessions running newer models
+- task-executor: moves from `inherit` to `opus` for consistent implementation quality regardless of the session model
+
+## code v2.6.0 - 2026-07-23
+
+### Improvements
+
+- architect + reviewer-correctness: switch to `inherit` so the highest-judgment work (design blueprints, bug/security review) rides the session model instead of a hardcoded pin that goes stale as new model families ship
+- explorer, reviewer-structure, reviewer-testing, reviewer-documentation: move from `sonnet` to `opus` (`fixer` already ran on `opus`)
+
+The three releases below (planning v4.2.0, code v2.5.0, brainstorm v4.2.0) come from a transcript audit of the last 31 real sessions using these plugins — every change in them traces to an observed failure or friction point.
+
+## planning v4.2.0 - 2026-07-23
+
+### Bug Fixes
+
+- make: the step-3 "Plan created. What's next?" menu listed 5 options, but AskUserQuestion caps options at 4 — every run threw a visible `InputValidationError` and the ad-hoc retry silently dropped a different option each time (usually "Auto review", which made the plan-review agent nearly unreachable). Reproduced in 8+ audited sessions. The menu is now 4 options with plan review folded into the execute path
+
+### New Features
+
+- execute: auto-runs the `plan-review` agent before the first task (it delivered verified, low-noise findings in all 6 audited runs). APPROVE → one-line note and continue; NEEDS REVISION → priority fixes are shown and the user chooses apply / execute as-is / stop
+- make + execute: plans record a `Base:` header (`branch@sha`), and execute verifies that commit is an ancestor of HEAD before running — catches worktrees created from a stale `origin/<default>` (EnterWorktree's `fresh` default), which previously cost a mid-pipeline rebase once and ~250K tokens of discarded work another time
+
+### Improvements
+
+- make: interview questions are now batched into one AskUserQuestion call and topics already settled by a design doc or earlier session answers are skipped; the plan title is derived from the design filename instead of asked; codebase facts asserted in questions/plans must be verified first (a plan once claimed "no test framework" in a repo with a gtest harness)
+- make: bug-fix plans must attempt reproduction first when feasible, or mark the diagnosis UNVERIFIED; the verify-acceptance template task gains a runtime-verification item (reproduce the original symptom / run the app) — an audited pipeline shipped a 1301-line "fix" for a hang it never reproduced, and the hang remained
+- execute: every task-executor prompt carries a session-constraints block (environment quirks like fish shell, user decisions, mid-session corrections) — an executor once reintroduced a bash-arithmetic-under-fish bug the user had already corrected in the same session
+- execute: manual/interactive tasks (visual checks, tests that synthesize keyboard/mouse events) are negotiated with the user instead of blindly delegated; adjacent trivial doc/one-line tasks may share one executor spawn instead of paying ~30K tokens of spin-up each
+- task-executor: stops and reports when the codebase materially contradicts the plan's assumptions instead of improvising a refactor; treats prompt constraints as binding
+
+## code v2.5.0 - 2026-07-23
+
+### Bug Fixes
+
+- review command: `commands/review.md` shadowed `skills/review/SKILL.md` for the name `code:review`, so invoking the skill loaded only the 3-line wrapper and the real workflow (hunk sync, confidence filter, prompt template) never entered context. The command now instructs reading the SKILL.md file directly
+- fixer: agent definition ordered a commit (Step 4) while sweep forbids fixer commits — every sweep prompt had to override the agent's own spec. The fixer now never commits or stages unless explicitly instructed
+
+### New Features
+
+- sweep: decision-context block — the orchestrator collects design-doc decisions, user choices from the session, and environment constraints, and passes them to every reviewer and fixer. Findings that contradict an approved decision are reported as `[DESIGN-CONFLICT]` and escalated to the user, never auto-fixed (a fixer once reversed a design-mandated close behavior it had no way to know about; reviewers re-litigated user-approved decisions at MAJOR severity)
+- sweep: safety snapshot before every fixer batch (`git add -A && git stash create && git reset -q` — dangling object, working tree untouched, SHA printed) so agent mistakes can't destroy uncommitted work — a fixer once ran `git checkout HEAD -- <files>` chasing a rustfmt nit and permanently destroyed uncommitted tests
+- sweep: final report discloses runtime verification status — when all gates were static (build/tests), it says so and recommends running the app before merging UI changes; audited sweeps shipped a keyboard-unreachable panel and a click-closes-the-app bug past 8 reviewer runs
+
+### Improvements
+
+- all reviewer agents: hardened rules — read-only now explicitly covers "temporary" edits; interactive/UI-driving tests are banned (one hijacked the user's screen mid-typing); full build/test-suite runs are banned (up to 11 redundant full validation cycles per sweep observed — fixers own the gates); provenance must be verified so pre-existing issues land in a separate `PRE-EXISTING` section instead of being attributed to the branch
+- sweep: severity discipline — MAJOR requires behavior/correctness impact; missing tests and doc drift are MINOR (an audited sweep had 7 "MAJOR" findings and zero behavior bugs, inflating fixer batches)
+- sweep: phase 2 reviewers prioritize the files phase 1 fixers modified — audited phase-2 findings were overwhelmingly fixer-introduced regressions (2/4, 2/2, 2/2 in three sessions)
+- sweep: mandated reports (findings lists, FIXES reports, final summary) must be visible text messages — on some models they sank into thinking blocks and the user saw nothing for 54 minutes; final counts are recomputed from the printed lists after two sessions reported wrong arithmetic
+- sweep: a failing test at sweep end is a finding, not an annoyance — "drop the failing test" framing once nearly buried a real product bug the user had to rescue
+- fixer: destructive-git ban (`checkout -- <paths>`, `restore`, `stash`, `reset`, `clean`), bounded validation (no interactive tests, ~10-minute ceiling with narrower targets instead of hangs — one fixer stalled 18 minutes on an XCUITest build), no speculative "preventive" fixes, no unverified enumerative doc claims (a wrong version bound written by a fixer became the next phase's CRITICAL), full repo-relative paths in reports, and a `design conflict` report category
+- reviewer-testing: checks that demanded tests are actually observable/testable in the project's harness before flagging (dismissal-rate driver in audited sweeps)
+- reviewer-documentation: stays in its lane (no code-provenance/merge-regression claims), stale counts are MINOR, and "corrected" enumerations must be derived from the source of truth (a reviewer's proposed count fix was itself arithmetically wrong)
+- review: triggers extended ("review current branch", "make a code review"); orchestrator must independently verify each CRITICAL finding before reporting; per-specialty focus lines allowed on the shared prompt; reviewer `PRE-EXISTING` items get their own report section
+- explorer: gained Bash (read-only usage — git diff/show/log/blame) — it previously had to caveat reports as "best-effort inference" because it couldn't run git at all
+
+## brainstorm v4.2.0 - 2026-07-23
+
+### Bug Fixes
+
+- do: Phase 4 design sections must be presented as visible message text before the approval question — on some models sections landed only in thinking blocks, and users blind-approved designs they never saw ("you showed nothing", observed 4 rounds in a row). Rule 1 now states the tool call follows visible text, never replaces it; the section must ALSO be mirrored into the "Looks good" option's `preview` field as a backup; the self-check enforces both, and the failure is a named WRONG/RIGHT example
+
+### Improvements
+
+- do: anchor on the user's words — Phase 1 restates the request in the user's own terms mapped to concrete code elements, and a free-text correction is final (never re-ask a question built on rejected framing); anchoring on code over user intent was the #1 source of pushback in audited sessions
+- do: bug reports get reproduced before designing (or the user is asked for repro steps), and static-only diagnoses prefer runtime verification before committing to a fix — two audited sessions designed confident fixes for wrong root causes
+- do: investigation requests gather measurements before scoping/tooling questions (asking first caused a full abandonment)
+- do: concrete facts in options (key chords, command names) must be grep-verified — a hallucinated "⌘K palette" once propagated into five doc surfaces
+- do: Phase 3 is explicitly optional — skip honestly with a "settled in Phase 2" note instead of staging fake comparisons (it was skipped-but-marked-completed in most audited sessions; when forced, it produced over-engineered machinery); approaches are sanity-checked against Phase 1 findings
+- do: load-bearing UX choices (keybindings, removals, narrow-width behavior) must be surfaced as their own questions, never buried in bulk section approvals — a buried width-guard decision shipped three visible regressions; designs that depend on the user's runtime environment (theme, install mode) ask about it
+- do: `code:explorer` subagents are for large/unfamiliar areas; small or well-understood areas are explored directly
+
 ## code v2.4.0 - 2026-07-22
 
 ### New Features

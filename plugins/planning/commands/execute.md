@@ -19,9 +19,10 @@ Execute an implementation plan by spawning a fresh `planning:task-executor` suba
 1. If path provided via `$ARGUMENTS`, use it
 2. Otherwise, check `docs/plans/` for plan files (exclude `completed/`). If multiple plans exist, use AskUserQuestion to let user pick
 3. Read the plan file and extract:
-   - **Header metadata**: Goal, Architecture, Tech Stack
+   - **Header metadata**: Goal, Architecture, Tech Stack, Base
    - **Task list**: All `### Task N:` sections in order
    - **Task count**: Total number of tasks
+4. **Verify the base** — if the header has a `Base:` entry (`<branch>@<sha>`), run `git merge-base --is-ancestor <sha> HEAD`. If the recorded commit is NOT an ancestor of the current HEAD, STOP and ask via AskUserQuestion before executing: the plan was written against a different base (common cause: a fresh worktree created from a stale `origin/<default>` while the plan targeted the local branch — EnterWorktree's default base is the remote). Options: "Fix the base first" / "Execute anyway". Executing on the wrong base has cost hundreds of thousands of tokens in discarded work.
 
 Report to user:
 > "Found N tasks in the implementation plan.
@@ -29,6 +30,13 @@ Report to user:
 > **Goal:** [goal from header]
 >
 > Starting execution..."
+
+### Step 1.5: Auto Plan Review
+
+Before executing any task, launch the plan-review agent (Agent tool, `subagent_type: "planning:plan-review"`) on the plan file — unless the user explicitly asks to skip it or a review already ran on this exact plan version in this session.
+
+- **APPROVE verdict** → report one line ("Plan review: approved") and continue to Step 2.
+- **NEEDS REVISION verdict** → print the priority fixes and ask via AskUserQuestion: "Apply the plan-review fixes before executing?" with options "Apply fixes" (revise the plan file accordingly, then continue) / "Execute as-is" / "Stop".
 
 ### Step 2: Create Tracking Tasks
 
@@ -52,10 +60,15 @@ For each task in order:
 3. **Spawn subagent** (MANDATORY): Use the Task tool with `subagent_type: "planning:task-executor"`. Pass:
    - Full task markdown (files, steps, code snippets)
    - Context about the overall goal
+   - **Session constraints** — a short "Constraints" block with everything learned this session that a fresh subagent cannot know: environment quirks (e.g. user's shell is fish — no bash `$(( ))` arithmetic), decisions the user made in brainstorm/plan review, corrections the user issued during earlier tasks, and the design doc path from the plan's `Design:` header. Keep it current: when the user corrects something mid-execution, every later executor prompt carries that correction
    - Instructions to follow the TDD steps exactly (if plan uses TDD format)
 4. **Wait for completion**
 5. **Mark task `completed`** via TaskUpdate (or keep `in_progress` on failure)
 6. **Report result**
+
+**Trivial-task exception**: adjacent tasks that are pure documentation or one-line changes may be combined into a single executor spawn (state the combination in the report). Everything else stays one fresh subagent per task.
+
+**Manual/interactive tasks**: if a task requires the user's machine, screen, or judgment (e.g. visual checks, tests that synthesize keyboard/mouse events, machine-specific diagnosis), do NOT spawn a subagent for it blindly. Tell the user what the task needs and ask via AskUserQuestion whether to run it now (with their cooperation), run it in the main session, or skip it. Interactive UI tests take over the user's screen — never run them without asking first.
 
 ### Step 4: Handle Failures
 

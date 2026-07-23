@@ -36,6 +36,7 @@ before asking questions, understand what the user is working on:
    - grep for error messages or function names mentioned in the request
    - read the specific file(s) involved
    - check `git log --oneline -5` for recent changes
+   - **reproduce the bug first when feasible** (run the failing command, test, or app). if reproduction is not feasible, mark the diagnosis as UNVERIFIED in the plan's Overview — a plan built on an assumed root cause must say so, and its verify task must reproduce the original symptom before declaring success
 
    **for refactoring/migration:**
    - glob for files matching the area being refactored
@@ -56,33 +57,26 @@ before asking questions, understand what the user is working on:
 
 ## step 1: present context and ask focused questions
 
-show the discovered context, then ask questions **one at a time** using the AskUserQuestion tool:
+show the discovered context, then ask the questions below using the AskUserQuestion tool:
 
 "based on your request, i found: [context summary]"
 
-**ask questions one at a time (do not overwhelm with multiple questions):**
+**skip questions already answered.** if step 0 loaded a design doc, or the session already settled a topic (brainstorm answers, explicit user statements earlier in the conversation), do NOT re-ask it — a decision the user already made is settled. in the design-doc path this typically leaves only the testing-approach question.
 
-1. **plan purpose**: use AskUserQuestion - "what is the main goal?"
-   - provide multiple choice with suggested answer based on discovered intent
-   - wait for response before next question
+**batch the remaining questions into a single AskUserQuestion call** (the tool takes up to 4 per call, max 4 options each). do not drip-feed one question per round.
 
-2. **scope**: use AskUserQuestion - "which components/files are involved?"
-   - provide multiple choice with suggested discovered files/areas
-   - wait for response before next question
+topics to cover (only where not already settled):
 
-3. **constraints**: use AskUserQuestion - "any specific requirements or limitations?"
-   - can be open-ended if constraints vary widely
-   - wait for response before next question
+1. **plan purpose**: "what is the main goal?" — multiple choice with suggested answer based on discovered intent
+2. **scope**: "which components/files are involved?" — multiple choice with suggested discovered files/areas
+3. **constraints**: "any specific requirements or limitations?" — can be open-ended if constraints vary widely
+4. **testing approach**: "do you prefer TDD or regular approach?" — options: "TDD (tests first)" and "Regular (code first, then tests)"; store preference for reference during implementation
 
-4. **testing approach**: use AskUserQuestion - "do you prefer TDD or regular approach?"
-   - options: "TDD (tests first)" and "Regular (code first, then tests)"
-   - store preference for reference during implementation
-   - wait for response before next question
+**plan title**: derive it yourself from the design filename or the request (e.g. `docs/plans/2026-07-23-glow-dot-design.md` → `glow-dot`). only ask if the topic is genuinely ambiguous — a title question with near-identical options is a round-trip tax.
 
-5. **plan title**: use AskUserQuestion - "short descriptive title?"
-   - provide suggested name based on intent
+after answers arrive, synthesize responses into plan context.
 
-after all questions answered, synthesize responses into plan context.
+**do not assert unverified codebase facts in questions or the plan** (e.g. "this project has no test framework") — verify with a quick Glob/Grep first; downstream skills treat plan statements as ground truth.
 
 ## step 1.5: explore approaches
 
@@ -134,6 +128,8 @@ check `docs/plans/` for existing files, then create `docs/plans/YYYY-MM-DD-<task
 **Tech Stack:** [key technologies/libraries]
 
 **Design:** [relative path to source design file under `docs/plans/`, or `none`]
+
+**Base:** [output of `git rev-parse --abbrev-ref HEAD`@`git rev-parse --short HEAD` at plan time — lets /planning:execute verify it runs on the same base the plan assumed]
 
 ## Overview
 - clear description of the feature/change being implemented
@@ -284,6 +280,7 @@ Example for Regular approach (continued):
 - [ ] run full test suite: `<project test command>`
 - [ ] run e2e tests if project has them: `<project e2e test command>`
 - [ ] verify test coverage meets project standard
+- [ ] **runtime verification** (where the project is runnable): launch/run the actual application and exercise the changed behavior end-to-end — for a bug-fix plan, reproduce the original symptom and confirm it is gone; for UI work, verify the feature is reachable and visible. If runtime verification is not feasible from this environment, record exactly what was NOT verified so the final report can disclose it — green tests alone are not proof the user-reported problem is solved
 
 ### Task N: [Final] Update documentation
 - [ ] update README.md if needed
@@ -309,7 +306,7 @@ Example for Regular approach (continued):
 
 after creating the file, tell user: "created plan: `docs/plans/YYYY-MM-DD-<task-name>.md`"
 
-then use AskUserQuestion:
+then use AskUserQuestion. **CRITICAL: the tool caps options at 4 — never offer more than 4 options in one question.**
 
 ```json
 {
@@ -317,10 +314,9 @@ then use AskUserQuestion:
     "question": "Plan created. What's next?",
     "header": "Next step",
     "options": [
-      {"label": "Execute with subagents", "description": "Run /planning:execute for task-by-task execution with fresh subagents"},
+      {"label": "Execute with subagents", "description": "Auto-review the plan with the plan-review agent, then run /planning:execute for task-by-task execution with fresh subagents"},
       {"label": "Interactive review", "description": "Open plan in editor for manual annotation and feedback loop"},
       {"label": "Implement", "description": "Implement task by task in this session"},
-      {"label": "Auto review", "description": "Launch AI plan-review agent for automated analysis"},
       {"label": "Done", "description": "No further action"}
     ],
     "multiSelect": false
@@ -328,7 +324,7 @@ then use AskUserQuestion:
 }
 ```
 
-- **Execute with subagents**: do NOT commit the plan. Invoke `/planning:execute <plan-file-path>` directly. The execute → sweep chain prompts about committing everything (plan + task changes + sweep fixes) once at the very end.
+- **Execute with subagents**: do NOT commit the plan. Invoke `/planning:execute <plan-file-path>` directly (it runs the plan-review agent first — see execute's Step 1.5). The execute → sweep chain prompts about committing everything (plan + task changes + sweep fixes) once at the very end.
 - **Interactive review**: check if `revdiff` is installed (`which revdiff`).
   - **if revdiff is available**: run `${CLAUDE_PLUGIN_ROOT}/scripts/launch-plan-review.sh <plan-file-path>` via Bash.
     the script opens revdiff TUI showing the plan with syntax highlighting. user adds line-level annotations.
@@ -351,8 +347,9 @@ then use AskUserQuestion:
     4. repeat until no diff output (user closed editor without changes)
   when the annotation loop completes, ask again with the remaining options (minus "Interactive review")
 - **Implement**: begin implementing task 1 interactively in this session. Use TodoWrite tool to track progress and mark todos completed immediately (do not batch). Do NOT commit during implementation. When the user finishes implementing (or pauses), call AskUserQuestion with "Commit all changes now?" (Yes/No). On Yes: `git add -A && git commit -m "<topic>: implement <plan-title>"`. On No: leave uncommitted.
-- **Auto review**: launch plan-review agent (Task tool with subagent_type=plan-review). After review completes, ask again with the same options (minus "Auto review")
 - **Done**: do NOT auto-commit. Call AskUserQuestion: "Plan file is ready. Commit it now?" with options Yes / No. On Yes: `git add <plan-file-path> && git commit -m "docs: add <topic> implementation plan"`. On No: leave the plan uncommitted in `docs/plans/`. Either way, stop after this prompt.
+
+a standalone plan review is still available any time: the user can ask for it in free text (via "Other") and you launch the plan-review agent (Agent tool with subagent_type=planning:plan-review), then re-ask the menu.
 
 ## execution enforcement
 
@@ -403,7 +400,7 @@ this ensures each task is solid before building on top of it.
 
 ## key principles
 
-- **one question at a time** - do not overwhelm user with multiple questions in a single message
+- **batch related questions, skip settled ones** - group remaining questions into one AskUserQuestion call (up to 4, max 4 options each); never re-ask what a design doc or earlier session answer already settled
 - **multiple choice preferred** - easier to answer than open-ended when possible
 - **DRY, YAGNI ruthlessly** - avoid unnecessary duplication and features, keep scope minimal (but prefer duplication over premature abstraction when it reduces coupling)
 - **lead with recommendation** - have an opinion, explain why, but let user decide
