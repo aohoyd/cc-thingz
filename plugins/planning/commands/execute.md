@@ -36,7 +36,7 @@ Report to user:
 Before executing any task, launch the plan-review agent (Agent tool, `subagent_type: "planning:plan-review"`) on the plan file — unless the user explicitly asks to skip it or a review already ran on this exact plan version in this session.
 
 - **APPROVE verdict** → report one line ("Plan review: approved") and continue to Step 2.
-- **NEEDS REVISION verdict** → print the priority fixes and ask via AskUserQuestion: "Apply the plan-review fixes before executing?" with options "Apply fixes" (revise the plan file accordingly, then continue) / "Execute as-is" / "Stop".
+- **NEEDS REVISION verdict** → print the priority fixes, revise the plan file to apply them, report a one-line summary of the revisions, then continue to Step 2. Do NOT ask for confirmation — apply the fixes automatically; the user can interrupt if they disagree with one.
 
 ### Step 2: Create Tracking Tasks
 

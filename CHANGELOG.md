@@ -4,6 +4,12 @@ This repo ships independent Claude Code plugins. Version headings use values fro
 
 Entries are sorted by plugin version date, newest first.
 
+## planning v4.4.0 - 2026-07-24
+
+### Improvements
+
+- execute: the auto plan-review's NEEDS REVISION path no longer asks apply / execute as-is / stop — the priority fixes are applied to the plan automatically and execution continues (interrupt if a fix is wrong)
+
 ## planning v4.3.0 - 2026-07-23
 
 ### Improvements
