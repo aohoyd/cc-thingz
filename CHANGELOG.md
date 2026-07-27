@@ -4,6 +4,16 @@ This repo ships independent Claude Code plugins. Version headings use values fro
 
 Entries are sorted by plugin version date, newest first.
 
+## brainstorm v4.3.0 - 2026-07-27
+
+### Improvements
+
+- do: prompt slimmed for Claude 5-generation models (Opus 5 / Fable 5), which follow instructions literally and lose quality under over-prescriptive scaffolding — per [Anthropic's context-engineering guidance](https://claude.com/blog/the-new-rules-of-context-engineering-for-claude-5-generation-models). 179 → 97 lines with no behavioral constraint removed:
+  - dropped the `<SELF-CHECK>` per-response checklist (a verification-scaffolding pattern that now causes over-verification); its two load-bearing items — visible content before any approval, free-text corrections are final — are promoted to top-level rules
+  - dropped the WRONG vs RIGHT example gallery; the one transcript-earned failure it guarded (approving a section the user never saw) is folded into the visible-approval rule
+  - deduplicated: the AskUserQuestion-not-plain-text rule was stated four times, now once; Key Principles keeps only items not already covered by rules or phases
+  - replaced "MANDATORY, NO EXCEPTIONS" caps-emphasis with plain declarative rules
+
 ## planning v4.4.0 - 2026-07-24
 
 ### Improvements
