@@ -4,6 +4,12 @@ This repo ships independent Claude Code plugins. Version headings use values fro
 
 Entries are sorted by plugin version date, newest first.
 
+## planning v4.5.0 - 2026-07-27
+
+### Improvements
+
+- make: no longer asks "TDD or regular?" — Claude picks the testing approach per task type (TDD for behavior specifiable up front: reproducible bug fixes, pure logic, parsers, contracts; regular for work whose shape emerges: UI, wiring, exploratory refactors) and records the choice with a one-line rationale in the plan. Mixing formats across tasks is allowed; a user-stated preference always overrides. With the question gone, the design-doc path often has nothing left to ask and skips the interview entirely
+
 ## brainstorm v4.3.0 - 2026-07-27
 
 ### Improvements

@@ -61,7 +61,7 @@ show the discovered context, then ask the questions below using the AskUserQuest
 
 "based on your request, i found: [context summary]"
 
-**skip questions already answered.** if step 0 loaded a design doc, or the session already settled a topic (brainstorm answers, explicit user statements earlier in the conversation), do NOT re-ask it — a decision the user already made is settled. in the design-doc path this typically leaves only the testing-approach question.
+**skip questions already answered.** if step 0 loaded a design doc, or the session already settled a topic (brainstorm answers, explicit user statements earlier in the conversation), do NOT re-ask it — a decision the user already made is settled. in the design-doc path this often leaves nothing to ask — skip the AskUserQuestion call entirely and proceed to step 1.5.
 
 **batch the remaining questions into a single AskUserQuestion call** (the tool takes up to 4 per call, max 4 options each). do not drip-feed one question per round.
 
@@ -70,7 +70,8 @@ topics to cover (only where not already settled):
 1. **plan purpose**: "what is the main goal?" — multiple choice with suggested answer based on discovered intent
 2. **scope**: "which components/files are involved?" — multiple choice with suggested discovered files/areas
 3. **constraints**: "any specific requirements or limitations?" — can be open-ended if constraints vary widely
-4. **testing approach**: "do you prefer TDD or regular approach?" — options: "TDD (tests first)" and "Regular (code first, then tests)"; store preference for reference during implementation
+
+**testing approach — decide it yourself, don't ask.** pick TDD or regular based on the work and record the choice with a one-line rationale in the plan's Development Approach. TDD fits behavior that can be specified before writing code (bug fixes with a reproducible failing case, pure logic, parsers, contracts); regular fits work whose shape emerges while building (UI, wiring/glue, exploratory refactors). mixing is fine when tasks differ — write TDD tasks in the TDD step format. a preference the user states at any point overrides your choice.
 
 **plan title**: derive it yourself from the design filename or the request (e.g. `docs/plans/2026-07-23-glow-dot-design.md` → `glow-dot`). only ask if the topic is genuinely ambiguous — a title question with near-identical options is a round-trip tax.
 
@@ -142,7 +143,7 @@ check `docs/plans/` for existing files, then create `docs/plans/YYYY-MM-DD-<task
 - dependencies identified: [dependencies]
 
 ## Development Approach
-- **testing approach**: [TDD / Regular - from user preference in planning]
+- **testing approach**: [TDD / Regular — chosen during planning; one-line rationale. user-stated preference overrides]
 - complete each task fully before moving to the next
 - make small, focused changes
 - **CRITICAL: every task MUST include new/updated tests** for code changes in that task

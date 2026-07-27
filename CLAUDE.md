@@ -9,8 +9,6 @@ Things to make Claude Code even better — hooks, skills, and commands, organize
 ## Key Rules
 
 - **README.md must be kept up to date** — whenever a new component, script, or configuration is added, update README.md with a description of what it does and how to use it.
-- Content is MIT-licensed.
-- This is a personal project by aohoyd (GitHub).
 - **No personal configuration** — scripts and configs must be generic and not contain hardcoded personal paths, editor preferences, or machine-specific settings. Use environment variables (e.g., `$EDITOR`) for user-specific values.
 - **Self-contained documentation** — do not reference external custom skills, actions, or configurations that exist only in a user's personal Claude Code setup. All documentation must refer only to what exists in this repository.
 
@@ -21,20 +19,7 @@ Things to make Claude Code even better — hooks, skills, and commands, organize
 - **Versioning** — each plugin has its own `version` in `plugins/<name>/.claude-plugin/plugin.json`. Bump independently per plugin. Use semver: patch for bug fixes, minor for new components, major for breaking changes. **Bump triggers on any change to bundled plugin content** — prompts, agents, references (e.g., `usage.md`), scripts, commands, hooks — not just `.claude-plugin/` files. Anything shipped to consumers via the plugin is a release artifact.
 - **Changelog**: when bumping a plugin version, update `CHANGELOG.md` in the same change. Version headings use the plugin name and plugin version (e.g., `## planning v3.7.1 - YYYY-MM-DD`), not tags. Keep entries grouped like the changelog style: New Features, Improvements, Bug Fixes, Other.
 - **Cross-references** — when skills reference other skills within the same plugin, use the plugin name prefix (e.g., `/review:writing-style`). When referencing skills in other plugins, use that plugin's name (e.g., `/planning:make`).
-
-## Structure
-
-- `.claude-plugin/marketplace.json` — marketplace catalog listing all plugins
-- `plugins/` — each subdirectory is an independent plugin:
-  - `plugins/brainstorm/` — collaborative design skill + command
-  - `plugins/code/` — review skill (report only) + sweep skill (2-phase review + fix) + explorer, architect agents + specialized reviewer agents (correctness, structure, testing, documentation) + fixer agent + ponytail skills (anti-over-engineering, adapted from upstream ponytail, skills-only/no hooks)
-  - `plugins/review/` — PR review skill + writing style skill
-  - `plugins/planning/` — plan command + execute command + task-executor agent + plan-annotate hook
-  - `plugins/release-tools/` — release workflow + last-tag skills
-  - `plugins/thinking-tools/` — dialectic analysis + root-cause-investigator skills
-  - `plugins/skill-eval/` — skill evaluation hook
-  - `plugins/workflow/` — session workflow helpers (learn, clarify, wrong, md-copy, txt-copy)
-- Each plugin has its own `.claude-plugin/plugin.json`, and standard subdirectories (`skills/`, `commands/`, `hooks/`, `agents/`) as needed.
+- **Ponytail skills** — `plugins/code/` ponytail skills are adapted from the upstream ponytail project, skills-only (no hooks).
 
 ## Local Plugin Development
 
